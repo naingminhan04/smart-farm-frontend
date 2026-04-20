@@ -38,3 +38,28 @@ export function setDoorState(state: "ON" | "OFF") {
 export function getCards() {
   return request<string[]>("/cards");
 }
+
+export function addCard(cardNum: string) {
+  return request<{ id: number; cardNum: string }>("/cards", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cardNum })
+  });
+}
+
+export function editCard(currentCardNum: string, nextCardNum: string) {
+  return request<{ id: number; cardNum: string }>(`/cards/${encodeURIComponent(currentCardNum)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cardNum: nextCardNum })
+  });
+}
+
+export async function deleteCard(cardNum: string) {
+  const res = await fetch(`${API_BASE}/cards/${encodeURIComponent(cardNum)}`, {
+    method: "DELETE"
+  });
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+}

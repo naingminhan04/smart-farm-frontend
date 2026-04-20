@@ -9,7 +9,17 @@ import {
   Tooltip,
   Legend
 } from "chart.js";
-import { getCards, getDoorState, getHistory, getLatest, setDoorState, TempHumiRecord } from "./api";
+import {
+  addCard,
+  deleteCard,
+  editCard,
+  getCards,
+  getDoorState,
+  getHistory,
+  getLatest,
+  setDoorState,
+  TempHumiRecord
+} from "./api";
 import "./App.css";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
@@ -19,6 +29,10 @@ function App() {
   const [history, setHistory] = useState<TempHumiRecord[]>([]);
   const [doorState, setDoorStateValue] = useState("OFF");
   const [cards, setCards] = useState<string[]>([]);
+  const [newCardNum, setNewCardNum] = useState("");
+  const [editingCardNum, setEditingCardNum] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+  const [cardSubmitting, setCardSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showTempFull, setShowTempFull] = useState(false);
@@ -51,6 +65,58 @@ function App() {
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to change door state");
+    }
+  }
+
+  async function handleAddCard() {
+    const cardNum = newCardNum.trim().toUpperCase();
+    if (!cardNum) {
+      setError("Card number cannot be empty");
+      return;
+    }
+    setCardSubmitting(true);
+    setError(null);
+    try {
+      await addCard(cardNum);
+      setNewCardNum("");
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add card");
+    } finally {
+      setCardSubmitting(false);
+    }
+  }
+
+  async function handleSaveEdit(cardNum: string) {
+    const nextCardNum = editingValue.trim().toUpperCase();
+    if (!nextCardNum) {
+      setError("Card number cannot be empty");
+      return;
+    }
+    setCardSubmitting(true);
+    setError(null);
+    try {
+      await editCard(cardNum, nextCardNum);
+      setEditingCardNum(null);
+      setEditingValue("");
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to edit card");
+    } finally {
+      setCardSubmitting(false);
+    }
+  }
+
+  async function handleDeleteCard(cardNum: string) {
+    setCardSubmitting(true);
+    setError(null);
+    try {
+      await deleteCard(cardNum);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete card");
+    } finally {
+      setCardSubmitting(false);
     }
   }
 
@@ -163,8 +229,69 @@ function App() {
 
       <section className="table-card">
         <h2>Allowed RFID Cards</h2>
-        <ul>
-          {cards.length ? cards.map((card) => <li key={card}>{card}</li>) : <li>No cards available.</li>}
+        <div className="card-input-row">
+          <input
+            value={newCardNum}
+            onChange={(event) => setNewCardNum(event.target.value)}
+            placeholder="Enter card number"
+          />
+          <button onClick={handleAddCard} disabled={cardSubmitting}>
+            Add Card
+          </button>
+        </div>
+        <ul className="card-list">
+          {cards.length ? cards.map((card) => {
+            const isEditing = editingCardNum === card;
+            return (
+              <li key={card} className="card-list-item">
+                {isEditing ? (
+                  <input
+                    value={editingValue}
+                    onChange={(event) => setEditingValue(event.target.value)}
+                  />
+                ) : (
+                  <span>{card}</span>
+                )}
+                <div className="card-actions">
+                  {isEditing ? (
+                    <>
+                      <button onClick={() => handleSaveEdit(card)} disabled={cardSubmitting}>Save</button>
+                      <button
+                        className="secondary"
+                        onClick={() => {
+                          setEditingCardNum(null);
+                          setEditingValue("");
+                        }}
+                        disabled={cardSubmitting}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className="secondary"
+                        onClick={() => {
+                          setEditingCardNum(card);
+                          setEditingValue(card);
+                        }}
+                        disabled={cardSubmitting}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="danger"
+                        onClick={() => handleDeleteCard(card)}
+                        disabled={cardSubmitting}
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
+              </li>
+            );
+          }) : <li>No cards available.</li>}
         </ul>
       </section>
     </div>

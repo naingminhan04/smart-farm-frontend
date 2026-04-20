@@ -126,6 +126,52 @@ button:disabled {
   padding-left: 18px;
 }
 
+.card-input-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.card-input-row input,
+.card-list-item input {
+  flex: 1;
+  min-width: 180px;
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 9px 10px;
+}
+
+.card-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.card-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #334155;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.card-actions .secondary {
+  background: #475569;
+  color: #f8fafc;
+}
+
+.card-actions .danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+
 .table-card {
   margin-top: 8px;
 }
