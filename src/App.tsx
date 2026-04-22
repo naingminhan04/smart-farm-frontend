@@ -319,7 +319,7 @@ function App() {
         else if (err.status === 400) setAuthError("Username and password are required.");
         else setAuthError(`Login failed (${err.status}).`);
       } else {
-        setAuthError("Login failed.");
+        setAuthError(err instanceof Error ? err.message : "Login failed.");
       }
     } finally {
       setAuthSubmitting(false);
@@ -351,7 +351,7 @@ function App() {
           setAuthError(`Sign up failed (${err.status}).`);
         }
       } else {
-        setAuthError("Sign up failed.");
+        setAuthError(err instanceof Error ? err.message : "Sign up failed.");
       }
     } finally {
       setAuthSubmitting(false);

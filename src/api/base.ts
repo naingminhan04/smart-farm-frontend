@@ -87,10 +87,11 @@ export async function readMaybeJson(res: Response) {
 }
 
 function buildNetworkError(err: unknown) {
-  const reason = err instanceof Error ? err.message : "Unknown network error";
-  return new Error(
-    `Failed to fetch from API (${API_BASE}). ${reason}. Check VITE_API_BASE, mixed-content (http vs https), and that the backend is reachable.`
-  );
+  const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+  const message = isOffline
+    ? "No internet connection. Please check your connection and try again."
+    : "Something went wrong while connecting to the server. Please try again.";
+  return new Error(message);
 }
 
 export async function request<T>(path: string, options?: RequestInit): Promise<T> {
