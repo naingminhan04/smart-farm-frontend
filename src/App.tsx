@@ -121,6 +121,7 @@ function App() {
   const [cardSubmitting, setCardSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
   const [showTempFull, setShowTempFull] = useState(false);
   const [showHumiFull, setShowHumiFull] = useState(false);
 
@@ -134,7 +135,9 @@ function App() {
   const [authTab, setAuthTab] = useState<"login" | "signup">("login");
   const [authProvider, setAuthProvider] = useState<OAuthProvider | "password" | null>(null);
 
-  async function loadData() {
+  async function loadData(options?: { manual?: boolean }) {
+    const isManual = options?.manual ?? false;
+    if (isManual) setManualRefreshing(true);
     setRefreshing(true);
     setError(null);
     try {
@@ -152,6 +155,7 @@ function App() {
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setRefreshing(false);
+      if (isManual) setManualRefreshing(false);
     }
   }
 
@@ -554,8 +558,13 @@ function App() {
                 </span>
                 Updated: {lastUpdatedLabel}
               </span>
-              <button onClick={loadData} disabled={refreshing} className={buttonPrimary}>
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+              <button onClick={() => loadData({ manual: true })} disabled={manualRefreshing} className={buttonPrimary}>
+                <svg
+                  viewBox="0 0 24 24"
+                  className={cx("h-4 w-4", manualRefreshing && "animate-spin")}
+                  fill="none"
+                  aria-hidden="true"
+                >
                   <path
                     d="M20 12a8 8 0 1 1-2.34-5.66"
                     stroke="currentColor"
@@ -570,7 +579,7 @@ function App() {
                     strokeLinejoin="round"
                   />
                 </svg>
-                {refreshing ? "Refreshing..." : "Refresh"}
+                Refresh
               </button>
               {admin ? (
                 <button
