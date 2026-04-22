@@ -13,7 +13,6 @@ import {
   addCard,
   AdminUser,
   adminLogin,
-  adminOauthBootstrapToken,
   adminOauthStartUrl,
   adminRegister,
   adminLogout,
@@ -60,6 +59,58 @@ const badgeClass = cx(
   "inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200"
 );
 
+function GoogleLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+      <path
+        fill="#EA4335"
+        d="M12 10.2v3.9h5.5c-.2 1.3-1.5 3.9-5.5 3.9-3.3 0-6-2.8-6-6.2s2.7-6.2 6-6.2c1.9 0 3.1.8 3.9 1.5l2.6-2.5C16.9 3 14.7 2 12 2 6.9 2 2.8 6.4 2.8 11.8S6.9 21.5 12 21.5c6.1 0 9.1-4.3 9.1-6.5 0-.4 0-.8-.1-1.1H12Z"
+      />
+      <path
+        fill="#34A853"
+        d="M2.8 11.8c0 1.7.6 3.3 1.7 4.6l3-2.3c-.4-.7-.7-1.5-.7-2.3s.2-1.6.7-2.3l-3-2.3c-1.1 1.3-1.7 2.9-1.7 4.6Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M12 21.5c2.7 0 4.9-.9 6.5-2.5l-3.2-2.5c-.9.6-2 .9-3.3.9-2.5 0-4.6-1.7-5.4-4l-3.1 2.4c1.7 3.4 5 5.7 8.5 5.7Z"
+      />
+      <path
+        fill="#4285F4"
+        d="M18.5 19c1.8-1.7 2.6-4.2 2.6-7.2 0-.7-.1-1.2-.2-1.7H12v3.9h5.5c-.1 1-.7 2.6-2.3 3.6l3.3 1.4Z"
+      />
+    </svg>
+  );
+}
+
+function GitHubLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+      <path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.2.8-.6v-2.1c-3.3.8-4-1.4-4-1.4-.6-1.5-1.4-1.9-1.4-1.9-1.2-.8.1-.8.1-.8 1.3.1 2 .9 2 .9 1.2 2 3.1 1.4 3.8 1.1.1-.9.5-1.4.8-1.7-2.7-.3-5.5-1.4-5.5-6A4.8 4.8 0 0 1 6.8 8c-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1a4.8 4.8 0 0 1 1.3 3.3c0 4.6-2.8 5.6-5.5 6 .5.4.9 1.1.9 2.3v3.4c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z" />
+    </svg>
+  );
+}
+
+function ProfileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+      <path
+        d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4.5 20a7.5 7.5 0 0 1 15 0"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function App() {
   const [latest, setLatest] = useState<TempHumiRecord | null>(null);
   const [history, setHistory] = useState<TempHumiRecord[]>([]);
@@ -78,7 +129,6 @@ function App() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authUsername, setAuthUsername] = useState("");
   const [authPassword, setAuthPassword] = useState("");
-  const [authSetupToken, setAuthSetupToken] = useState("");
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
@@ -312,7 +362,7 @@ function App() {
     setAuthSubmitting(true);
     setAuthError(null);
     try {
-      const result = await adminRegister(username, authPassword, authSetupToken.trim());
+      const result = await adminRegister(username, authPassword);
       setAdminTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
       setAdmin(result.admin);
       setAuthPassword("");
@@ -337,18 +387,7 @@ function App() {
     setAuthError(null);
 
     try {
-      let bootstrapToken: string | undefined;
-      if (authTab === "signup") {
-        const setupToken = authSetupToken.trim();
-        if (!setupToken) {
-          setAuthError("Setup token is required for OAuth sign up.");
-          return;
-        }
-        const bt = await adminOauthBootstrapToken(setupToken);
-        bootstrapToken = bt.bootstrapToken;
-      }
-
-      const url = adminOauthStartUrl(provider, bootstrapToken);
+      const url = adminOauthStartUrl(provider);
       const popup = window.open(
         url,
         "sf_admin_oauth",
@@ -363,9 +402,7 @@ function App() {
       popup.focus();
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 409) setAuthError("An admin already exists. Use OAuth login instead.");
-        else if (err.status === 401) setAuthError("Invalid setup token.");
-        else setAuthError(`OAuth failed (${err.status}).`);
+        setAuthError(`OAuth failed (${err.status}).`);
       } else {
         setAuthError("OAuth failed.");
       }
@@ -494,19 +531,6 @@ function App() {
                 </span>
                 Updated: {lastUpdatedLabel}
               </span>
-              {admin ? (
-                <button
-                  className={buttonMuted}
-                  onClick={() => openAdminLogin(`Signed in as ${admin.username}.`)}
-                  title="Admin session"
-                >
-                  Admin
-                </button>
-              ) : (
-                <button className={buttonMuted} onClick={() => openAdminLogin()} title="Admin login">
-                  Admin
-                </button>
-              )}
               <button onClick={loadData} disabled={refreshing} className={buttonPrimary}>
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
                   <path
@@ -525,6 +549,33 @@ function App() {
                 </svg>
                 {refreshing ? "Refreshing..." : "Refresh"}
               </button>
+              {admin ? (
+                <button
+                  className={cx(
+                    buttonBase,
+                    "h-11 w-11 rounded-2xl px-0",
+                    "border border-emerald-300/35 bg-emerald-400 text-slate-950 hover:bg-emerald-300"
+                  )}
+                  onClick={() => openAdminLogin(`Signed in as ${admin.username}.`)}
+                  title={`Admin session: ${admin.username}`}
+                  aria-label={`Admin session: ${admin.username}`}
+                >
+                  <ProfileIcon />
+                </button>
+              ) : (
+                <button
+                  className={cx(
+                    buttonBase,
+                    "h-11 w-11 rounded-2xl px-0",
+                    "border border-sky-300/30 bg-sky-400 text-slate-950 hover:bg-sky-300"
+                  )}
+                  onClick={() => openAdminLogin()}
+                  title="Admin login"
+                  aria-label="Admin login"
+                >
+                  <ProfileIcon />
+                </button>
+              )}
             </div>
           </div>
         </header>
@@ -821,10 +872,10 @@ function App() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold tracking-tight">
-                  {admin ? "Admin Session" : authTab === "signup" ? "Create Admin" : "Admin Login"}
+                  {admin ? "Admin Session" : authTab === "signup" ? "Create account" : "Welcome back"}
                 </h3>
                 <p className="mt-1 text-xs text-slate-400">
-                  Required for door control and RFID card management.
+                  Use the same fields below for either sign up or login.
                 </p>
               </div>
               <div className="flex gap-2">
@@ -868,37 +919,6 @@ function App() {
               </button>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <button
-                className={cx(buttonMuted, "w-full")}
-                onClick={() => startOauth("google")}
-                disabled={authSubmitting || (authTab === "signup" && !authSetupToken.trim())}
-                title={authTab === "signup" && !authSetupToken.trim() ? "Setup token required for OAuth sign up" : ""}
-              >
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white/10 text-xs font-black">
-                  G
-                </span>
-                Continue with Google
-              </button>
-              <button
-                className={cx(buttonMuted, "w-full")}
-                onClick={() => startOauth("github")}
-                disabled={authSubmitting || (authTab === "signup" && !authSetupToken.trim())}
-                title={authTab === "signup" && !authSetupToken.trim() ? "Setup token required for OAuth sign up" : ""}
-              >
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white/10 text-xs font-black">
-                  GH
-                </span>
-                Continue with GitHub
-              </button>
-            </div>
-
-            <div className="mt-4 flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/10" />
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">or</div>
-              <div className="h-px flex-1 bg-white/10" />
-            </div>
-
             {authError && (
               <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-sm text-red-100">
                 {authError}
@@ -934,21 +954,6 @@ function App() {
                   }}
                 />
               </div>
-              {authTab === "signup" ? (
-                <div>
-                  <label className="text-xs font-semibold text-slate-300">Setup Token</label>
-                  <input
-                    value={authSetupToken}
-                    onChange={(e) => setAuthSetupToken(e.target.value)}
-                    className={cx(inputClass, "mt-2 w-full")}
-                    placeholder="ADMIN_SETUP_TOKEN"
-                    disabled={authSubmitting}
-                  />
-                  <p className="mt-2 text-xs text-slate-400">
-                    Only OAuth sign up uses the setup token. Username/password sign up works without it.
-                  </p>
-                </div>
-              ) : null}
             </div>
 
             <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -957,13 +962,54 @@ function App() {
               </button>
               {authTab === "signup" ? (
                 <button className={buttonPrimary} onClick={handleAdminRegister} disabled={authSubmitting}>
-                  {authSubmitting ? "Creating..." : "Create admin"}
+                  {authSubmitting ? "Signing up..." : "Sign up"}
                 </button>
               ) : (
                 <button className={buttonPrimary} onClick={handleAdminLogin} disabled={authSubmitting}>
                   {authSubmitting ? "Signing in..." : "Sign in"}
                 </button>
               )}
+            </div>
+
+            <div className="mt-6 flex items-center gap-3">
+              <div className="h-px flex-1 bg-white/10" />
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Or continue with
+              </div>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                className={cx(
+                  buttonBase,
+                  "w-full border border-[#4285F4]/30 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(240,244,255,0.95))] text-slate-900 shadow-[0_12px_30px_rgba(66,133,244,0.18)] hover:border-[#4285F4]/50 hover:shadow-[0_16px_40px_rgba(66,133,244,0.26)]"
+                )}
+                onClick={() => startOauth("google")}
+                disabled={authSubmitting}
+              >
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
+                  <GoogleLogo />
+                </span>
+                <span className="text-sm font-semibold">
+                  {authTab === "signup" ? "Sign up with Google" : "Sign in with Google"}
+                </span>
+              </button>
+              <button
+                className={cx(
+                  buttonBase,
+                  "w-full border border-slate-700/80 bg-[linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))] text-white shadow-[0_12px_30px_rgba(15,23,42,0.42)] hover:border-slate-500/80 hover:bg-[linear-gradient(135deg,rgba(51,65,85,0.96),rgba(15,23,42,1))]"
+                )}
+                onClick={() => startOauth("github")}
+                disabled={authSubmitting}
+              >
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
+                  <GitHubLogo />
+                </span>
+                <span className="text-sm font-semibold">
+                  {authTab === "signup" ? "Sign up with GitHub" : "Sign in with GitHub"}
+                </span>
+              </button>
             </div>
           </div>
         </div>

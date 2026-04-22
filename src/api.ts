@@ -235,25 +235,16 @@ export async function adminLogin(username: string, password: string) {
   });
 }
 
-export async function adminRegister(username: string, password: string, setupToken: string) {
+export async function adminRegister(username: string, password: string) {
   return request<{ admin: AdminUser; accessToken: string; refreshToken: string }>("/admin/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password, token: setupToken })
+    body: JSON.stringify({ username, password })
   });
 }
 
-export async function adminOauthBootstrapToken(setupToken: string) {
-  return request<{ bootstrapToken: string; expiresInSeconds: number }>("/admin/oauth/bootstrap-token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token: setupToken })
-  });
-}
-
-export function adminOauthStartUrl(provider: OAuthProvider, bootstrapToken?: string) {
-  const url = new URL(`${API_BASE}/admin/oauth/${provider}/start`);
-  if (bootstrapToken) url.searchParams.set("bootstrapToken", bootstrapToken);
+export function adminOauthStartUrl(provider: OAuthProvider) {
+  const url = new URL(`${API_BASE}/auth/${provider}`, window.location.origin);
   return url.toString();
 }
 
