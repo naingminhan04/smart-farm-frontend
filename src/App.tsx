@@ -11,12 +11,25 @@ import {
 } from "chart.js";
 import {
   addCard,
+  AdminUser,
+  adminLogin,
+  adminOauthBootstrapToken,
+  adminOauthStartUrl,
+  adminRegister,
+  adminLogout,
+  adminMe,
+  ApiError,
+  clearAdminTokens,
   deleteCard,
   editCard,
+  getApiOrigin,
+  getAdminTokens,
   getCards,
   getDoorState,
   getHistory,
   getLatest,
+  OAuthProvider,
+  setAdminTokens,
   setDoorState,
   TempHumiRecord
 } from "./api";
@@ -61,6 +74,16 @@ function App() {
   const [showTempFull, setShowTempFull] = useState(false);
   const [showHumiFull, setShowHumiFull] = useState(false);
 
+  const [admin, setAdmin] = useState<AdminUser | null>(null);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authUsername, setAuthUsername] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authSetupToken, setAuthSetupToken] = useState("");
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [authTab, setAuthTab] = useState<"login" | "signup">("login");
+
   async function loadData() {
     setRefreshing(true);
     setError(null);
@@ -83,15 +106,23 @@ function App() {
   }
 
   async function handleDoor(state: "ON" | "OFF") {
+    if (!ensureAdmin("Admin login required to control the door.")) return;
     try {
       await setDoorState(state);
       await loadData();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearAdminTokens();
+        setAdmin(null);
+        openAdminLogin("Session expired. Please login again.");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to change door state");
     }
   }
 
   async function handleAddCard() {
+    if (!ensureAdmin()) return;
     const cardNum = newCardNum.trim().toUpperCase();
     if (!cardNum) {
       setError("Card number cannot be empty");
@@ -104,6 +135,12 @@ function App() {
       setNewCardNum("");
       await loadData();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearAdminTokens();
+        setAdmin(null);
+        openAdminLogin("Session expired. Please login again.");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to add card");
     } finally {
       setCardSubmitting(false);
@@ -111,6 +148,7 @@ function App() {
   }
 
   async function handleSaveEdit(cardNum: string) {
+    if (!ensureAdmin()) return;
     const nextCardNum = editingValue.trim().toUpperCase();
     if (!nextCardNum) {
       setError("Card number cannot be empty");
@@ -124,6 +162,12 @@ function App() {
       setEditingValue("");
       await loadData();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearAdminTokens();
+        setAdmin(null);
+        openAdminLogin("Session expired. Please login again.");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to edit card");
     } finally {
       setCardSubmitting(false);
@@ -131,12 +175,19 @@ function App() {
   }
 
   async function handleDeleteCard(cardNum: string) {
+    if (!ensureAdmin()) return;
     setCardSubmitting(true);
     setError(null);
     try {
       await deleteCard(cardNum);
       await loadData();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearAdminTokens();
+        setAdmin(null);
+        openAdminLogin("Session expired. Please login again.");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to delete card");
     } finally {
       setCardSubmitting(false);
@@ -149,10 +200,179 @@ function App() {
     return () => window.clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const tokens = getAdminTokens();
+        if (!tokens.accessToken && !tokens.refreshToken) {
+          if (!cancelled) setAdmin(null);
+          return;
+        }
+        const me = await adminMe();
+        if (!cancelled) {
+          setAdmin(me.admin ? { id: me.admin.id, username: me.admin.username } : null);
+        }
+      } catch {
+        clearAdminTokens();
+        if (!cancelled) setAdmin(null);
+      } finally {
+        if (!cancelled) setAuthChecking(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const expectedOrigin = getApiOrigin();
+
+    function onMessage(event: MessageEvent) {
+      if (!expectedOrigin || event.origin !== expectedOrigin) return;
+      const data = event.data as any;
+      if (!data || typeof data !== "object") return;
+
+      if (data.type === "sf_admin_oauth") {
+        if (typeof data.accessToken === "string" && typeof data.refreshToken === "string") {
+          setAdminTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+        }
+        if (data.admin && typeof data.admin.username === "string" && typeof data.admin.id === "number") {
+          setAdmin({ id: data.admin.id, username: data.admin.username });
+        }
+        setAuthPassword("");
+        setAuthError(null);
+        setIsAuthOpen(false);
+        return;
+      }
+
+      if (data.type === "sf_admin_oauth_error") {
+        setAuthError(typeof data.error === "string" ? data.error : "OAuth failed.");
+        setIsAuthOpen(true);
+        return;
+      }
+    }
+
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
   const busy = refreshing || cardSubmitting;
 
   const lastUpdated = latest?.updatedTime ? new Date(latest.updatedTime) : null;
   const lastUpdatedLabel = lastUpdated ? lastUpdated.toLocaleString() : "No data yet";
+
+  function openAdminLogin(reason?: string) {
+    setAuthError(reason ?? null);
+    setAuthTab("login");
+    setIsAuthOpen(true);
+  }
+
+  function ensureAdmin(reason?: string) {
+    if (admin) return true;
+    openAdminLogin(reason ?? "Admin login required to manage cards.");
+    return false;
+  }
+
+  async function handleAdminLogin() {
+    setAuthSubmitting(true);
+    setAuthError(null);
+    try {
+      const result = await adminLogin(authUsername.trim(), authPassword);
+      setAdminTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
+      setAdmin(result.admin);
+      setAuthPassword("");
+      setIsAuthOpen(false);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setAuthError(err.status === 401 ? "Invalid username or password." : `Login failed (${err.status}).`);
+      } else {
+        setAuthError("Login failed.");
+      }
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
+  async function handleAdminRegister() {
+    setAuthSubmitting(true);
+    setAuthError(null);
+    try {
+      const result = await adminRegister(authUsername.trim(), authPassword, authSetupToken.trim());
+      setAdminTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
+      setAdmin(result.admin);
+      setAuthPassword("");
+      setIsAuthOpen(false);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 401) setAuthError("Invalid setup token.");
+        else if (err.status === 409) setAuthError("An admin already exists. Please sign in.");
+        else setAuthError(`Sign up failed (${err.status}).`);
+      } else {
+        setAuthError("Sign up failed.");
+      }
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
+  async function startOauth(provider: OAuthProvider) {
+    if (authSubmitting) return;
+
+    setAuthSubmitting(true);
+    setAuthError(null);
+
+    try {
+      let bootstrapToken: string | undefined;
+      if (authTab === "signup") {
+        const setupToken = authSetupToken.trim();
+        if (!setupToken) {
+          setAuthError("Setup token is required for OAuth sign up.");
+          return;
+        }
+        const bt = await adminOauthBootstrapToken(setupToken);
+        bootstrapToken = bt.bootstrapToken;
+      }
+
+      const url = adminOauthStartUrl(provider, bootstrapToken);
+      const popup = window.open(
+        url,
+        "sf_admin_oauth",
+        "popup=yes,width=520,height=680,menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes"
+      );
+
+      if (!popup) {
+        setAuthError("Popup blocked. Please allow popups for this site.");
+        return;
+      }
+
+      popup.focus();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 409) setAuthError("An admin already exists. Use OAuth login instead.");
+        else if (err.status === 401) setAuthError("Invalid setup token.");
+        else setAuthError(`OAuth failed (${err.status}).`);
+      } else {
+        setAuthError("OAuth failed.");
+      }
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
+  async function handleAdminLogout() {
+    const tokens = getAdminTokens();
+    try {
+      if (tokens.refreshToken) await adminLogout(tokens.refreshToken);
+    } catch {
+      // If logout fails (network), still clear local tokens.
+    } finally {
+      clearAdminTokens();
+      setAdmin(null);
+      setEditingCardNum(null);
+      setEditingValue("");
+    }
+  }
 
   const buildChartData = (
     records: TempHumiRecord[],
@@ -260,6 +480,19 @@ function App() {
                 </span>
                 Updated: {lastUpdatedLabel}
               </span>
+              {admin ? (
+                <button
+                  className={buttonMuted}
+                  onClick={() => openAdminLogin(`Signed in as ${admin.username}.`)}
+                  title="Admin session"
+                >
+                  Admin
+                </button>
+              ) : (
+                <button className={buttonMuted} onClick={() => openAdminLogin()} title="Admin login">
+                  Admin
+                </button>
+              )}
               <button onClick={loadData} disabled={refreshing} className={buttonPrimary}>
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
                   <path
@@ -435,7 +668,19 @@ function App() {
               <h2 className="text-sm font-semibold text-slate-200">Allowed RFID Cards</h2>
               <p className="mt-1 text-xs text-slate-400">Manage access cards for the door controller.</p>
             </div>
-            <span className={badgeClass}>{cards.length} cards</span>
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <span className={badgeClass}>{cards.length} cards</span>
+              {authChecking ? <span className={badgeClass}>Checking admin...</span> : null}
+              {admin ? (
+                <span className={cx(badgeClass, "border-emerald-400/30 bg-emerald-400/10 text-emerald-100")}>
+                  Admin: {admin.username}
+                </span>
+              ) : (
+                <span className={cx(badgeClass, "border-amber-300/30 bg-amber-300/10 text-amber-50")}>
+                  Admin locked
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -444,11 +689,21 @@ function App() {
               onChange={(event) => setNewCardNum(event.target.value)}
               placeholder="Enter card number"
               className={inputClass}
+              disabled={!admin || cardSubmitting}
             />
-            <button onClick={handleAddCard} disabled={cardSubmitting} className={buttonPrimary}>
+            <button
+              onClick={handleAddCard}
+              disabled={cardSubmitting}
+              className={buttonPrimary}
+            >
               Add Card
             </button>
           </div>
+          {!admin && (
+            <p className="mt-2 text-xs text-slate-400">
+              Login is required to add, edit, or delete cards. Sensor and door features remain public.
+            </p>
+          )}
 
           <div className="mt-5">
             <ul className="space-y-2">
@@ -467,6 +722,7 @@ function App() {
                             value={editingValue}
                             onChange={(event) => setEditingValue(event.target.value)}
                             className={cx(inputClass, "mt-2 w-full")}
+                            disabled={!admin || cardSubmitting}
                           />
                         ) : (
                           <div className="mt-1 break-all text-sm font-semibold tracking-wide text-slate-100">
@@ -500,6 +756,7 @@ function App() {
                           <>
                             <button
                               onClick={() => {
+                                if (!ensureAdmin()) return;
                                 setEditingCardNum(card);
                                 setEditingValue(card);
                               }}
@@ -534,6 +791,170 @@ function App() {
           Smart Farm Dashboard. UI refreshes automatically; manual refresh available above.
         </footer>
       </div>
+
+      {isAuthOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+            aria-label="Close"
+            onClick={() => setIsAuthOpen(false)}
+          />
+          <div className={cx(panelClass, "relative z-10 w-full max-w-md")}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold tracking-tight">
+                  {admin ? "Admin Session" : authTab === "signup" ? "Create Admin" : "Admin Login"}
+                </h3>
+                <p className="mt-1 text-xs text-slate-400">
+                  Required for door control and RFID card management.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {admin ? (
+                  <button className={buttonDanger} onClick={handleAdminLogout} disabled={authSubmitting}>
+                    Logout
+                  </button>
+                ) : null}
+                <button className={buttonMuted} onClick={() => setIsAuthOpen(false)}>
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 flex w-full items-center rounded-full border border-white/10 bg-white/5 p-1">
+              <button
+                onClick={() => {
+                  setAuthTab("login");
+                  setAuthError(null);
+                }}
+                className={cx(
+                  "flex-1 rounded-full px-3 py-1 text-xs font-semibold transition",
+                  authTab === "login" ? "bg-white/10 text-slate-100" : "text-slate-300 hover:text-slate-100"
+                )}
+                disabled={authSubmitting}
+              >
+                Login
+              </button>
+              <button
+                onClick={() => {
+                  setAuthTab("signup");
+                  setAuthError(null);
+                }}
+                className={cx(
+                  "flex-1 rounded-full px-3 py-1 text-xs font-semibold transition",
+                  authTab === "signup" ? "bg-white/10 text-slate-100" : "text-slate-300 hover:text-slate-100"
+                )}
+                disabled={authSubmitting}
+              >
+                Sign up
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                className={cx(buttonMuted, "w-full")}
+                onClick={() => startOauth("google")}
+                disabled={authSubmitting || (authTab === "signup" && !authSetupToken.trim())}
+                title={authTab === "signup" && !authSetupToken.trim() ? "Setup token required for sign up" : ""}
+              >
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white/10 text-xs font-black">
+                  G
+                </span>
+                Continue with Google
+              </button>
+              <button
+                className={cx(buttonMuted, "w-full")}
+                onClick={() => startOauth("github")}
+                disabled={authSubmitting || (authTab === "signup" && !authSetupToken.trim())}
+                title={authTab === "signup" && !authSetupToken.trim() ? "Setup token required for sign up" : ""}
+              >
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white/10 text-xs font-black">
+                  GH
+                </span>
+                Continue with GitHub
+              </button>
+            </div>
+
+            <div className="mt-4 flex items-center gap-3">
+              <div className="h-px flex-1 bg-white/10" />
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">or</div>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+
+            {authError && (
+              <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-sm text-red-100">
+                {authError}
+              </div>
+            )}
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-300">Username</label>
+                <input
+                  value={authUsername}
+                  onChange={(e) => setAuthUsername(e.target.value)}
+                  className={cx(inputClass, "mt-2 w-full")}
+                  autoComplete="username"
+                  disabled={authSubmitting}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-300">Password</label>
+                <input
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className={cx(inputClass, "mt-2 w-full")}
+                  type="password"
+                  autoComplete="current-password"
+                  disabled={authSubmitting}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      if (authTab === "signup") handleAdminRegister();
+                      else handleAdminLogin();
+                    }
+                    if (e.key === "Escape") setIsAuthOpen(false);
+                  }}
+                />
+              </div>
+              {authTab === "signup" ? (
+                <div>
+                  <label className="text-xs font-semibold text-slate-300">Setup Token</label>
+                  <input
+                    value={authSetupToken}
+                    onChange={(e) => setAuthSetupToken(e.target.value)}
+                    className={cx(inputClass, "mt-2 w-full")}
+                    placeholder="ADMIN_SETUP_TOKEN"
+                    disabled={authSubmitting}
+                  />
+                  <p className="mt-2 text-xs text-slate-400">
+                    Security: sign up only works before the first admin is created and requires the backend
+                    setup token.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button className={buttonMuted} onClick={() => setIsAuthOpen(false)} disabled={authSubmitting}>
+                Cancel
+              </button>
+              {authTab === "signup" ? (
+                <button className={buttonPrimary} onClick={handleAdminRegister} disabled={authSubmitting}>
+                  {authSubmitting ? "Creating..." : "Create admin"}
+                </button>
+              ) : (
+                <button className={buttonPrimary} onClick={handleAdminLogin} disabled={authSubmitting}>
+                  {authSubmitting ? "Signing in..." : "Sign in"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
