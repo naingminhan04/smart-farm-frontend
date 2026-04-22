@@ -91,7 +91,7 @@ function GitHubLogo() {
 
 function ProfileIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-6 w-6 flex-none" fill="none" aria-hidden="true">
       <path
         d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
         stroke="currentColor"
@@ -576,27 +576,31 @@ function App() {
                 <button
                   className={cx(
                     buttonBase,
-                    "h-11 w-11 shrink-0 rounded-2xl px-0",
+                    "h-11 w-11 min-h-11 min-w-11 shrink-0 rounded-2xl px-0",
                     "border border-emerald-300/35 bg-emerald-400 text-slate-950 hover:bg-emerald-300"
                   )}
                   onClick={openAdminSession}
                   title={`Admin session: ${admin.username}`}
                   aria-label={`Admin session: ${admin.username}`}
                 >
-                  <ProfileIcon />
+                  <span className="inline-flex h-6 w-6 flex-none items-center justify-center">
+                    <ProfileIcon />
+                  </span>
                 </button>
               ) : (
                 <button
                   className={cx(
                     buttonBase,
-                    "h-11 w-11 shrink-0 rounded-2xl px-0",
+                    "h-11 w-11 min-h-11 min-w-11 shrink-0 rounded-2xl px-0",
                     "border border-sky-300/30 bg-sky-400 text-slate-950 hover:bg-sky-300"
                   )}
                   onClick={() => openAdminLogin()}
                   title="Admin login"
                   aria-label="Admin login"
                 >
-                  <ProfileIcon />
+                  <span className="inline-flex h-6 w-6 flex-none items-center justify-center">
+                    <ProfileIcon />
+                  </span>
                 </button>
               )}
             </div>
