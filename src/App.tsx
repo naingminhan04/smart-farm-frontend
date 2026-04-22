@@ -21,7 +21,6 @@ import {
   clearAdminTokens,
   deleteCard,
   editCard,
-  getApiOrigin,
   getAdminTokens,
   getCards,
   getDoorState,
@@ -133,6 +132,7 @@ function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [authTab, setAuthTab] = useState<"login" | "signup">("login");
+  const [authProvider, setAuthProvider] = useState<OAuthProvider | "password" | null>(null);
 
   async function loadData() {
     setRefreshing(true);
@@ -276,38 +276,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const expectedOrigin = getApiOrigin();
-
-    function onMessage(event: MessageEvent) {
-      if (!expectedOrigin || event.origin !== expectedOrigin) return;
-      const data = event.data as any;
-      if (!data || typeof data !== "object") return;
-
-      if (data.type === "sf_admin_oauth") {
-        if (typeof data.accessToken === "string" && typeof data.refreshToken === "string") {
-          setAdminTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
-        }
-        if (data.admin && typeof data.admin.username === "string" && typeof data.admin.id === "number") {
-          setAdmin({ id: data.admin.id, username: data.admin.username });
-        }
-        setAuthPassword("");
-        setAuthError(null);
-        setIsAuthOpen(false);
-        return;
-      }
-
-      if (data.type === "sf_admin_oauth_error") {
-        setAuthError(typeof data.error === "string" ? data.error : "OAuth failed.");
-        setIsAuthOpen(true);
-        return;
-      }
-    }
-
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
 
     async function handleOauthCallbackRedirect() {
@@ -342,6 +310,7 @@ function App() {
 
         if (me.admin) {
           setAdmin({ id: me.admin.id, username: me.admin.username });
+          setAuthProvider((params.get("provider") as OAuthProvider | null) || null);
           setAuthError(null);
           setIsAuthOpen(false);
         } else {
@@ -377,6 +346,11 @@ function App() {
     setIsAuthOpen(true);
   }
 
+  function openAdminSession() {
+    setAuthError(null);
+    setIsAuthOpen(true);
+  }
+
   function ensureAdmin(reason?: string) {
     if (admin) return true;
     openAdminLogin(reason ?? "Admin login required to manage cards.");
@@ -396,6 +370,7 @@ function App() {
       const result = await adminLogin(username, authPassword);
       setAdminTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
       setAdmin(result.admin);
+      setAuthProvider("password");
       setAuthPassword("");
       setIsAuthOpen(false);
     } catch (err) {
@@ -424,6 +399,7 @@ function App() {
       const result = await adminRegister(username, authPassword);
       setAdminTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
       setAdmin(result.admin);
+      setAuthProvider("password");
       setAuthPassword("");
       setIsAuthOpen(false);
     } catch (err) {
@@ -442,32 +418,9 @@ function App() {
   async function startOauth(provider: OAuthProvider) {
     if (authSubmitting) return;
 
-    setAuthSubmitting(true);
     setAuthError(null);
-
-    try {
-      const url = adminOauthStartUrl(provider);
-      const popup = window.open(
-        url,
-        "sf_admin_oauth",
-        "popup=yes,width=520,height=680,menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes"
-      );
-
-      if (!popup) {
-        setAuthError("Popup blocked. Please allow popups for this site.");
-        return;
-      }
-
-      popup.focus();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setAuthError(`OAuth failed (${err.status}).`);
-      } else {
-        setAuthError("OAuth failed.");
-      }
-    } finally {
-      setAuthSubmitting(false);
-    }
+    const url = adminOauthStartUrl(provider);
+    window.location.assign(url);
   }
 
   async function handleAdminLogout() {
@@ -479,10 +432,21 @@ function App() {
     } finally {
       clearAdminTokens();
       setAdmin(null);
+      setAuthProvider(null);
+      setIsAuthOpen(false);
       setEditingCardNum(null);
       setEditingValue("");
     }
   }
+
+  const authMethodLabel =
+    authProvider === "google"
+      ? "Google"
+      : authProvider === "github"
+        ? "GitHub"
+        : authProvider === "password"
+          ? "Username & Password"
+          : "Unknown";
 
   const buildChartData = (
     records: TempHumiRecord[],
@@ -612,10 +576,10 @@ function App() {
                 <button
                   className={cx(
                     buttonBase,
-                    "h-11 w-11 rounded-2xl px-0",
+                    "h-11 w-11 shrink-0 rounded-2xl px-0",
                     "border border-emerald-300/35 bg-emerald-400 text-slate-950 hover:bg-emerald-300"
                   )}
-                  onClick={() => openAdminLogin(`Signed in as ${admin.username}.`)}
+                  onClick={openAdminSession}
                   title={`Admin session: ${admin.username}`}
                   aria-label={`Admin session: ${admin.username}`}
                 >
@@ -625,7 +589,7 @@ function App() {
                 <button
                   className={cx(
                     buttonBase,
-                    "h-11 w-11 rounded-2xl px-0",
+                    "h-11 w-11 shrink-0 rounded-2xl px-0",
                     "border border-sky-300/30 bg-sky-400 text-slate-950 hover:bg-sky-300"
                   )}
                   onClick={() => openAdminLogin()}
@@ -931,51 +895,17 @@ function App() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold tracking-tight">
-                  {admin ? "Admin Session" : authTab === "signup" ? "Create account" : "Welcome back"}
+                  {admin ? "Account" : authTab === "signup" ? "Create account" : "Welcome back"}
                 </h3>
                 <p className="mt-1 text-xs text-slate-400">
-                  Use the same fields below for either sign up or login.
+                  {admin ? "Your current admin session details." : "Use the same fields below for either sign up or login."}
                 </p>
               </div>
-              <div className="flex gap-2">
-                {admin ? (
-                  <button className={buttonDanger} onClick={handleAdminLogout} disabled={authSubmitting}>
-                    Logout
-                  </button>
-                ) : null}
+              {!admin ? (
                 <button className={buttonMuted} onClick={() => setIsAuthOpen(false)}>
                   Close
                 </button>
-              </div>
-            </div>
-
-            <div className="mt-4 flex w-full items-center rounded-full border border-white/10 bg-white/5 p-1">
-              <button
-                onClick={() => {
-                  setAuthTab("login");
-                  setAuthError(null);
-                }}
-                className={cx(
-                  "flex-1 rounded-full px-3 py-1 text-xs font-semibold transition",
-                  authTab === "login" ? "bg-white/10 text-slate-100" : "text-slate-300 hover:text-slate-100"
-                )}
-                disabled={authSubmitting}
-              >
-                Login
-              </button>
-              <button
-                onClick={() => {
-                  setAuthTab("signup");
-                  setAuthError(null);
-                }}
-                className={cx(
-                  "flex-1 rounded-full px-3 py-1 text-xs font-semibold transition",
-                  authTab === "signup" ? "bg-white/10 text-slate-100" : "text-slate-300 hover:text-slate-100"
-                )}
-                disabled={authSubmitting}
-              >
-                Sign up
-              </button>
+              ) : null}
             </div>
 
             {authError && (
@@ -983,93 +913,155 @@ function App() {
                 {authError}
               </div>
             )}
+            {admin ? (
+              <>
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Logged In User
+                    </div>
+                    <div className="mt-2 text-base font-semibold text-slate-100">{admin.username}</div>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Login Method
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 text-base font-semibold text-slate-100">
+                      {authProvider === "google" ? <GoogleLogo /> : null}
+                      {authProvider === "github" ? <GitHubLogo /> : null}
+                      <span>{authMethodLabel}</span>
+                    </div>
+                  </div>
+                </div>
 
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Username</label>
-                <input
-                  value={authUsername}
-                  onChange={(e) => setAuthUsername(e.target.value)}
-                  className={cx(inputClass, "mt-2 w-full")}
-                  autoComplete="username"
-                  disabled={authSubmitting}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Password</label>
-                <input
-                  value={authPassword}
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                  className={cx(inputClass, "mt-2 w-full")}
-                  type="password"
-                  autoComplete="current-password"
-                  disabled={authSubmitting}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      if (authTab === "signup") handleAdminRegister();
-                      else handleAdminLogin();
-                    }
-                    if (e.key === "Escape") setIsAuthOpen(false);
-                  }}
-                />
-              </div>
-            </div>
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <button className={buttonMuted} onClick={() => setIsAuthOpen(false)} disabled={authSubmitting}>
+                    Cancel
+                  </button>
+                  <button className={buttonDanger} onClick={handleAdminLogout} disabled={authSubmitting}>
+                    Logout
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mt-4 flex w-full items-center rounded-full border border-white/10 bg-white/5 p-1">
+                  <button
+                    onClick={() => {
+                      setAuthTab("login");
+                      setAuthError(null);
+                    }}
+                    className={cx(
+                      "flex-1 rounded-full px-3 py-1 text-xs font-semibold transition",
+                      authTab === "login" ? "bg-white/10 text-slate-100" : "text-slate-300 hover:text-slate-100"
+                    )}
+                    disabled={authSubmitting}
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAuthTab("signup");
+                      setAuthError(null);
+                    }}
+                    className={cx(
+                      "flex-1 rounded-full px-3 py-1 text-xs font-semibold transition",
+                      authTab === "signup" ? "bg-white/10 text-slate-100" : "text-slate-300 hover:text-slate-100"
+                    )}
+                    disabled={authSubmitting}
+                  >
+                    Sign up
+                  </button>
+                </div>
 
-            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <button className={buttonMuted} onClick={() => setIsAuthOpen(false)} disabled={authSubmitting}>
-                Cancel
-              </button>
-              {authTab === "signup" ? (
-                <button className={buttonPrimary} onClick={handleAdminRegister} disabled={authSubmitting}>
-                  {authSubmitting ? "Signing up..." : "Sign up"}
-                </button>
-              ) : (
-                <button className={buttonPrimary} onClick={handleAdminLogin} disabled={authSubmitting}>
-                  {authSubmitting ? "Signing in..." : "Sign in"}
-                </button>
-              )}
-            </div>
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Username</label>
+                    <input
+                      value={authUsername}
+                      onChange={(e) => setAuthUsername(e.target.value)}
+                      className={cx(inputClass, "mt-2 w-full")}
+                      autoComplete="username"
+                      disabled={authSubmitting}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300">Password</label>
+                    <input
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      className={cx(inputClass, "mt-2 w-full")}
+                      type="password"
+                      autoComplete="current-password"
+                      disabled={authSubmitting}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          if (authTab === "signup") handleAdminRegister();
+                          else handleAdminLogin();
+                        }
+                        if (e.key === "Escape") setIsAuthOpen(false);
+                      }}
+                    />
+                  </div>
+                </div>
 
-            <div className="mt-6 flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/10" />
-              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                Or continue with
-              </div>
-              <div className="h-px flex-1 bg-white/10" />
-            </div>
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <button className={buttonMuted} onClick={() => setIsAuthOpen(false)} disabled={authSubmitting}>
+                    Cancel
+                  </button>
+                  {authTab === "signup" ? (
+                    <button className={buttonPrimary} onClick={handleAdminRegister} disabled={authSubmitting}>
+                      {authSubmitting ? "Signing up..." : "Sign up"}
+                    </button>
+                  ) : (
+                    <button className={buttonPrimary} onClick={handleAdminLogin} disabled={authSubmitting}>
+                      {authSubmitting ? "Signing in..." : "Sign in"}
+                    </button>
+                  )}
+                </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <button
-                className={cx(
-                  buttonBase,
-                  "w-full border border-[#4285F4]/30 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(240,244,255,0.95))] text-slate-900 shadow-[0_12px_30px_rgba(66,133,244,0.18)] hover:border-[#4285F4]/50 hover:shadow-[0_16px_40px_rgba(66,133,244,0.26)]"
-                )}
-                onClick={() => startOauth("google")}
-                disabled={authSubmitting}
-              >
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
-                  <GoogleLogo />
-                </span>
-                <span className="text-sm font-semibold">
-                  {authTab === "signup" ? "Sign up with Google" : "Sign in with Google"}
-                </span>
-              </button>
-              <button
-                className={cx(
-                  buttonBase,
-                  "w-full border border-slate-700/80 bg-[linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))] text-white shadow-[0_12px_30px_rgba(15,23,42,0.42)] hover:border-slate-500/80 hover:bg-[linear-gradient(135deg,rgba(51,65,85,0.96),rgba(15,23,42,1))]"
-                )}
-                onClick={() => startOauth("github")}
-                disabled={authSubmitting}
-              >
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
-                  <GitHubLogo />
-                </span>
-                <span className="text-sm font-semibold">
-                  {authTab === "signup" ? "Sign up with GitHub" : "Sign in with GitHub"}
-                </span>
-              </button>
-            </div>
+                <div className="mt-6 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-white/10" />
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    Or continue with
+                  </div>
+                  <div className="h-px flex-1 bg-white/10" />
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button
+                    className={cx(
+                      buttonBase,
+                      "w-full border border-[#4285F4]/30 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(240,244,255,0.95))] text-slate-900 hover:border-[#4285F4]/50"
+                    )}
+                    onClick={() => startOauth("google")}
+                    disabled={authSubmitting}
+                  >
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white">
+                      <GoogleLogo />
+                    </span>
+                    <span className="text-sm font-semibold">
+                      {authTab === "signup" ? "Sign up with Google" : "Sign in with Google"}
+                    </span>
+                  </button>
+                  <button
+                    className={cx(
+                      buttonBase,
+                      "w-full border border-slate-700/80 bg-[linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))] text-white hover:border-slate-500/80 hover:bg-[linear-gradient(135deg,rgba(51,65,85,0.96),rgba(15,23,42,1))]"
+                    )}
+                    onClick={() => startOauth("github")}
+                    disabled={authSubmitting}
+                  >
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
+                      <GitHubLogo />
+                    </span>
+                    <span className="text-sm font-semibold">
+                      {authTab === "signup" ? "Sign up with GitHub" : "Sign in with GitHub"}
+                    </span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
