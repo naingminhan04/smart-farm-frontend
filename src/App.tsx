@@ -307,6 +307,65 @@ function App() {
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function handleOauthCallbackRedirect() {
+      if (window.location.pathname !== "/auth/callback") return;
+
+      const hash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+      const params = new URLSearchParams(hash);
+      const accessToken = params.get("accessToken") || "";
+      const refreshToken = params.get("refreshToken") || "";
+      const error = params.get("error") || "";
+
+      if (error) {
+        setAuthError(error);
+        setIsAuthOpen(true);
+        window.history.replaceState({}, "", "/");
+        return;
+      }
+
+      if (!accessToken || !refreshToken) {
+        setAuthError("OAuth callback is missing login tokens.");
+        setIsAuthOpen(true);
+        window.history.replaceState({}, "", "/");
+        return;
+      }
+
+      try {
+        setAdminTokens({ accessToken, refreshToken });
+        const me = await adminMe();
+        if (cancelled) return;
+
+        if (me.admin) {
+          setAdmin({ id: me.admin.id, username: me.admin.username });
+          setAuthError(null);
+          setIsAuthOpen(false);
+        } else {
+          clearAdminTokens();
+          setAuthError("OAuth login completed, but no admin profile was returned.");
+          setIsAuthOpen(true);
+        }
+      } catch {
+        if (cancelled) return;
+        clearAdminTokens();
+        setAuthError("OAuth login could not be completed.");
+        setIsAuthOpen(true);
+      } finally {
+        window.history.replaceState({}, "", "/");
+      }
+    }
+
+    void handleOauthCallbackRedirect();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const busy = refreshing || cardSubmitting;
 
   const lastUpdated = latest?.updatedTime ? new Date(latest.updatedTime) : null;
