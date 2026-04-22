@@ -275,17 +275,25 @@ function App() {
   }
 
   async function handleAdminLogin() {
+    const username = authUsername.trim();
+    if (!username || !authPassword) {
+      setAuthError("Username and password are required.");
+      return;
+    }
+
     setAuthSubmitting(true);
     setAuthError(null);
     try {
-      const result = await adminLogin(authUsername.trim(), authPassword);
+      const result = await adminLogin(username, authPassword);
       setAdminTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
       setAdmin(result.admin);
       setAuthPassword("");
       setIsAuthOpen(false);
     } catch (err) {
       if (err instanceof ApiError) {
-        setAuthError(err.status === 401 ? "Invalid username or password." : `Login failed (${err.status}).`);
+        if (err.status === 401) setAuthError("Invalid username or password.");
+        else if (err.status === 400) setAuthError("Username and password are required.");
+        else setAuthError(`Login failed (${err.status}).`);
       } else {
         setAuthError("Login failed.");
       }
@@ -295,18 +303,24 @@ function App() {
   }
 
   async function handleAdminRegister() {
+    const username = authUsername.trim();
+    if (!username || !authPassword) {
+      setAuthError("Username and password are required.");
+      return;
+    }
+
     setAuthSubmitting(true);
     setAuthError(null);
     try {
-      const result = await adminRegister(authUsername.trim(), authPassword, authSetupToken.trim());
+      const result = await adminRegister(username, authPassword, authSetupToken.trim());
       setAdminTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
       setAdmin(result.admin);
       setAuthPassword("");
       setIsAuthOpen(false);
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 401) setAuthError("Invalid setup token.");
-        else if (err.status === 409) setAuthError("An admin already exists. Please sign in.");
+        if (err.status === 400) setAuthError("Username must be 3-64 characters and password at least 8 characters.");
+        else if (err.status === 409) setAuthError("That username is already taken. Please choose another or sign in.");
         else setAuthError(`Sign up failed (${err.status}).`);
       } else {
         setAuthError("Sign up failed.");
@@ -859,7 +873,7 @@ function App() {
                 className={cx(buttonMuted, "w-full")}
                 onClick={() => startOauth("google")}
                 disabled={authSubmitting || (authTab === "signup" && !authSetupToken.trim())}
-                title={authTab === "signup" && !authSetupToken.trim() ? "Setup token required for sign up" : ""}
+                title={authTab === "signup" && !authSetupToken.trim() ? "Setup token required for OAuth sign up" : ""}
               >
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white/10 text-xs font-black">
                   G
@@ -870,7 +884,7 @@ function App() {
                 className={cx(buttonMuted, "w-full")}
                 onClick={() => startOauth("github")}
                 disabled={authSubmitting || (authTab === "signup" && !authSetupToken.trim())}
-                title={authTab === "signup" && !authSetupToken.trim() ? "Setup token required for sign up" : ""}
+                title={authTab === "signup" && !authSetupToken.trim() ? "Setup token required for OAuth sign up" : ""}
               >
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white/10 text-xs font-black">
                   GH
@@ -931,8 +945,7 @@ function App() {
                     disabled={authSubmitting}
                   />
                   <p className="mt-2 text-xs text-slate-400">
-                    Security: sign up only works before the first admin is created and requires the backend
-                    setup token.
+                    Only OAuth sign up uses the setup token. Username/password sign up works without it.
                   </p>
                 </div>
               ) : null}

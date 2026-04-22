@@ -18,9 +18,22 @@ function normalizeApiBase(input: string) {
   return trimmed;
 }
 
-const API_BASE = normalizeApiBase(
-  import.meta.env.VITE_API_BASE || "https://smart-farm-backend--naingminhan.replit.app/api"
-);
+function resolveApiBase() {
+  const configured = normalizeApiBase(import.meta.env.VITE_API_BASE || "");
+  if (configured) return configured;
+
+  if (typeof window !== "undefined") {
+    const { hostname } = window.location;
+    const isLocalDev = hostname === "localhost" || hostname === "127.0.0.1";
+
+    // Use the Vite dev proxy locally so auth and API calls hit the local backend.
+    if (isLocalDev) return "/api";
+  }
+
+  return normalizeApiBase("https://smart-farm-backend--naingminhan.replit.app/api");
+}
+
+const API_BASE = resolveApiBase();
 
 export type OAuthProvider = "google" | "github";
 
@@ -30,7 +43,7 @@ export function getApiBase() {
 
 export function getApiOrigin() {
   try {
-    return new URL(API_BASE).origin;
+    return new URL(API_BASE, window.location.origin).origin;
   } catch {
     return "";
   }
