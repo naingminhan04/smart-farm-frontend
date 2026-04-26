@@ -498,7 +498,6 @@ function App() {
             setActiveTab(tab);
             window.location.hash = tab;
           }}
-          onLogout={handleAdminLogout}
           onOpenAdminSession={openAdminSession}
           onOpenAdminLogin={() => openAdminLogin()}
         />

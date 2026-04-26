@@ -6,7 +6,6 @@ export function DashboardHeader({
   activeTab,
   admin,
   onTabChange,
-  onLogout,
   onOpenAdminSession,
   onOpenAdminLogin
 }: DashboardHeaderProps) {
@@ -142,17 +141,6 @@ export function DashboardHeader({
                   Sign in
                 </button>
               )}
-              {admin ? (
-                <button
-                  type="button"
-                  className={cx(navButtonClass, navInactiveClass)}
-                  onClick={onLogout}
-                  title="Logout"
-                  aria-label="Logout"
-                >
-                  Logout
-                </button>
-              ) : null}
             </nav>
           </div>
         </div>

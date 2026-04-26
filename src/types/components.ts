@@ -45,7 +45,6 @@ export type DashboardHeaderProps = {
   activeTab: AppTab;
   admin: AdminUser | null;
   onTabChange: (tab: AppTab) => void;
-  onLogout: () => void;
   onOpenAdminSession: () => void;
   onOpenAdminLogin: () => void;
 };
