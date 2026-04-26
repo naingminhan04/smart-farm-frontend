@@ -71,7 +71,7 @@ export function CardsPanel({
       </div>
       {!admin && (
         <p className="mt-2 text-xs text-slate-400">
-          Login is required to add, edit, or delete cards. Sensor and door features remain public.
+          Login is required to add, edit, or delete cards.
         </p>
       )}
 
@@ -83,7 +83,7 @@ export function CardsPanel({
               return (
                 <li
                   key={card}
-                  className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 transition hover:bg-white/[0.07] sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 rounded-2xl border border-neutral-700/70 bg-neutral-800/70 px-4 py-3 transition hover:bg-neutral-700/70 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-semibold text-slate-400">Card</div>
@@ -124,7 +124,7 @@ export function CardsPanel({
               );
             })
           ) : (
-            <li className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+            <li className="rounded-2xl border border-neutral-700/70 bg-neutral-800/70 px-4 py-3 text-sm text-slate-300">
               No cards available.
             </li>
           )}

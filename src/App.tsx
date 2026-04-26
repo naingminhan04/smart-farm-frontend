@@ -31,14 +31,15 @@ import { AuthModal } from "./components/AuthModal";
 import { CardsPanel } from "./components/CardsPanel";
 import { DashboardHeader } from "./components/DashboardHeader";
 import { DoorControlCard } from "./components/DoorControlCard";
+import { FeatureSection } from "./components/FeatureSection";
 import { HistoryChartCard } from "./components/HistoryChartCard";
 import { MetricCard } from "./components/MetricCard";
-import { ShowcaseSection } from "./components/ShowcaseSection";
+import { ShowcasePlaceholderSection } from "./components/ShowcasePlaceholderSection";
 import type { AdminUser, OAuthProvider, TempHumiRecord } from "./types";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
-type AppTab = "dashboard" | "showcase";
+type AppTab = "dashboard" | "feature" | "showcase";
 
 function App() {
   const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
@@ -65,6 +66,19 @@ function App() {
   const [authChecking, setAuthChecking] = useState(true);
   const [authTab, setAuthTab] = useState<"login" | "signup">("login");
   const [authProvider, setAuthProvider] = useState<OAuthProvider | "password" | null>(null);
+
+  useEffect(() => {
+    const applyHashTab = () => {
+      const raw = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
+      if (raw === "dashboard" || raw === "feature" || raw === "showcase") {
+        setActiveTab(raw);
+      }
+    };
+
+    applyHashTab();
+    window.addEventListener("hashchange", applyHashTab);
+    return () => window.removeEventListener("hashchange", applyHashTab);
+  }, []);
 
   async function loadData(options?: { manual?: boolean }) {
     const isManual = options?.manual ?? false;
@@ -452,22 +466,23 @@ function App() {
   );
 
   return (
-    <div className="relative min-h-screen bg-slate-950 font-sans text-slate-100 antialiased">
+    <div className="relative min-h-screen bg-neutral-900 font-sans text-neutral-100 antialiased">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-24 left-[-140px] h-[420px] w-[420px] animate-slow-float rounded-full bg-sky-500/10 blur-3xl" />
-        <div className="absolute -bottom-28 right-[-120px] h-[460px] w-[460px] animate-slow-float rounded-full bg-emerald-500/10 blur-3xl [animation-delay:1.2s]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(56,189,248,0.10),transparent_55%),radial-gradient(circle_at_80%_10%,rgba(16,185,129,0.10),transparent_50%)]" />
-        <div className="absolute inset-0 opacity-[0.22] [background-image:linear-gradient(to_right,rgba(148,163,184,0.22)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.22)_1px,transparent_1px)] [background-size:56px_56px]" />
+        <div className="absolute -top-24 left-[-140px] h-[420px] w-[420px] animate-slow-float rounded-full bg-neutral-100/5 blur-3xl" />
+        <div className="absolute -bottom-28 right-[-120px] h-[460px] w-[460px] animate-slow-float rounded-full bg-blue-300/10 blur-3xl [animation-delay:1.2s]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.06),transparent_55%),radial-gradient(circle_at_80%_10%,rgba(147,197,253,0.08),transparent_50%)]" />
+        <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(to_right,rgba(255,255,255,0.14)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.14)_1px,transparent_1px)] [background-size:56px_56px]" />
       </div>
 
       <div className="relative mx-auto max-w-[1200px] px-4 py-6 sm:px-6">
         <DashboardHeader
           activeTab={activeTab}
           admin={admin}
-          lastUpdatedLabel={lastUpdatedLabel}
-          manualRefreshing={manualRefreshing}
-          onTabChange={setActiveTab}
-          onManualRefresh={() => loadData({ manual: true })}
+          onTabChange={(tab) => {
+            setActiveTab(tab);
+            window.location.hash = tab;
+          }}
+          onLogout={handleAdminLogout}
           onOpenAdminSession={openAdminSession}
           onOpenAdminLogin={() => openAdminLogin()}
         />
@@ -475,9 +490,9 @@ function App() {
         {activeTab === "dashboard" ? (
           <>
             {error && (
-              <div className="mb-6 animate-fade-up rounded-2xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-sm text-red-100 backdrop-blur-xl">
+              <div className="mb-6 animate-fade-up rounded-2xl border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 backdrop-blur-xl">
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 h-2.5 w-2.5 rounded-full bg-red-300" />
+                  <div className="mt-0.5 h-2.5 w-2.5 rounded-full bg-neutral-500" />
                   <div className="flex-1">{error}</div>
                 </div>
               </div>
@@ -535,14 +550,18 @@ function App() {
               onEditingValueChange={setEditingValue}
             />
           </>
+        ) : activeTab === "feature" ? (
+          <FeatureSection />
         ) : (
-          <ShowcaseSection />
+          <ShowcasePlaceholderSection />
         )}
 
-        <footer className="pb-2 pt-6 text-xs text-slate-500">
+        <footer className="pb-2 pt-6 text-xs text-zinc-500">
           {activeTab === "dashboard"
-            ? "Smart Farm Dashboard. UI refreshes automatically; manual refresh available above."
-            : "Smart Farm Showcase. Diagrams are curated in the frontend now, and videos or more images can be added later."}
+            ? "Smart Farm Dashboard."
+            : activeTab === "feature"
+              ? "Smart Farm Feature diagrams."
+              : "Smart Farm Showcase."}
         </footer>
       </div>
 

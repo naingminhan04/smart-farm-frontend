@@ -1,15 +1,12 @@
+import { useEffect, useRef, useState } from "react";
 import type { AdminUser } from "../types";
-import { ProfileIcon } from "./icons";
-import { badgeClass, buttonBase, buttonPrimary } from "./ui";
 import { cx } from "./utils";
 
 type DashboardHeaderProps = {
-  activeTab: "dashboard" | "showcase";
+  activeTab: "dashboard" | "feature" | "showcase";
   admin: AdminUser | null;
-  lastUpdatedLabel: string;
-  manualRefreshing: boolean;
-  onTabChange: (tab: "dashboard" | "showcase") => void;
-  onManualRefresh: () => void;
+  onTabChange: (tab: "dashboard" | "feature" | "showcase") => void;
+  onLogout: () => void;
   onOpenAdminSession: () => void;
   onOpenAdminLogin: () => void;
 };
@@ -17,130 +14,178 @@ type DashboardHeaderProps = {
 export function DashboardHeader({
   activeTab,
   admin,
-  lastUpdatedLabel,
-  manualRefreshing,
   onTabChange,
-  onManualRefresh,
+  onLogout,
   onOpenAdminSession,
   onOpenAdminLogin
 }: DashboardHeaderProps) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastScrollYRef = useRef(0);
+  const navButtonClass = "rounded-md px-2.5 py-1.5 text-sm font-medium transition";
+  const navActiveClass = "text-white";
+  const navInactiveClass = "text-slate-400 hover:text-slate-200";
+
+  function handleSelectTab(tab: "dashboard" | "feature" | "showcase") {
+    onTabChange(tab);
+    setMobileMenuOpen(false);
+  }
+
+  useEffect(() => {
+    const onScroll = () => {
+      const currentY = window.scrollY;
+      const previousY = lastScrollYRef.current;
+
+      if (currentY <= 8) {
+        setHeaderVisible(true);
+      } else if (currentY < previousY) {
+        setHeaderVisible(true);
+      } else if (currentY > previousY) {
+        setHeaderVisible(false);
+      }
+
+      lastScrollYRef.current = currentY;
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="animate-fade-up">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl border border-white/10 bg-white/5 p-2 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
-            <svg viewBox="0 0 24 24" className="h-full w-full text-sky-300" fill="none" aria-hidden="true">
-              <path
-                d="M5 17c2.2 0 3.4-1.4 4.4-2.7C10.5 12.9 11.5 12 13 12c2.3 0 3.7 2 6 2"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-              <path
-                d="M7 7l2.5 2.5L12 7l2.5 2.5L17 7"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+    <header
+      className={cx(
+        "sticky top-0 z-40 mb-6 animate-fade-up transition-transform duration-300",
+        headerVisible ? "translate-y-0" : "-translate-y-[120%]"
+      )}
+    >
+      <div className="relative z-40 -mx-4 -mt-6 w-auto border-b border-slate-800 bg-neutral-900 px-4 py-3 shadow-[0_14px_30px_rgba(0,0,0,0.35)] backdrop-blur sm:-mx-6 sm:border sm:border-slate-800 sm:px-5">
+        <div className="flex items-center justify-between gap-3 lg:gap-6">
+          <div className="min-w-0 flex items-center">
+            <h1 className="text-lg font-semibold tracking-tight text-slate-100 sm:text-xl">Smart Farm</h1>
           </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-[1.9rem]">Smart Farm Dashboard</h1>
-            <p className="mt-1 text-sm text-slate-300">
-              Live environment telemetry, access control, and door automation.
-            </p>
-            <div className="mt-4 inline-flex rounded-2xl border border-white/10 bg-slate-900/70 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
+
+          <div className="flex items-center gap-2 sm:hidden">
+            {admin ? (
               <button
                 type="button"
-                onClick={() => onTabChange("dashboard")}
-                className={cx(
-                  "rounded-xl px-4 py-2 text-sm font-semibold transition",
-                  activeTab === "dashboard" ? "bg-sky-400 text-slate-950" : "text-slate-300 hover:bg-white/5"
-                )}
+                className={cx(navButtonClass, navInactiveClass)}
+                onClick={onOpenAdminSession}
+                title={`Admin session: ${admin.username}`}
+                aria-label={`Admin session: ${admin.username}`}
+              >
+                Profile
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={cx(navButtonClass, navInactiveClass)}
+                onClick={onOpenAdminLogin}
+                title="Admin login"
+                aria-label="Admin login"
+              >
+                Sign in
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              className="inline-flex items-center rounded-md border border-slate-700 bg-[#11161d] px-2 py-1.5 text-xs font-medium text-slate-200"
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            >
+              <span className="flex h-3.5 w-3.5 flex-col justify-between">
+                <span className="h-px w-full bg-slate-300" />
+                <span className="h-px w-full bg-slate-300" />
+                <span className="h-px w-full bg-slate-300" />
+              </span>
+            </button>
+          </div>
+
+          <div className="hidden flex-wrap items-center gap-2 sm:ml-auto sm:flex sm:justify-end">
+            <nav className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleSelectTab("dashboard")}
+                className={cx(navButtonClass, activeTab === "dashboard" ? navActiveClass : navInactiveClass)}
               >
                 Dashboard
               </button>
               <button
                 type="button"
-                onClick={() => onTabChange("showcase")}
-                className={cx(
-                  "rounded-xl px-4 py-2 text-sm font-semibold transition",
-                  activeTab === "showcase" ? "bg-emerald-400 text-slate-950" : "text-slate-300 hover:bg-white/5"
-                )}
+                onClick={() => handleSelectTab("feature")}
+                className={cx(navButtonClass, activeTab === "feature" ? navActiveClass : navInactiveClass)}
+              >
+                Feature
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectTab("showcase")}
+                className={cx(navButtonClass, activeTab === "showcase" ? navActiveClass : navInactiveClass)}
               >
                 Showcase
               </button>
-            </div>
+              {admin ? (
+                <button
+                  type="button"
+                  className={cx(navButtonClass, navInactiveClass)}
+                  onClick={onOpenAdminSession}
+                  title={`Admin session: ${admin.username}`}
+                  aria-label={`Admin session: ${admin.username}`}
+                >
+                  Profile
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={cx(navButtonClass, navInactiveClass)}
+                  onClick={onOpenAdminLogin}
+                  title="Admin login"
+                  aria-label="Admin login"
+                >
+                  Sign in
+                </button>
+              )}
+              {admin ? (
+                <button
+                  type="button"
+                  className={cx(navButtonClass, navInactiveClass)}
+                  onClick={onLogout}
+                  title="Logout"
+                  aria-label="Logout"
+                >
+                  Logout
+                </button>
+              ) : null}
+            </nav>
           </div>
         </div>
-      </div>
 
-      <div className="animate-fade-up [animation-delay:80ms]">
-        <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-          {activeTab === "dashboard" ? (
-            <>
-              <span className={badgeClass}>
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-soft-pulse rounded-full bg-emerald-400/70" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-                </span>
-                Updated: {lastUpdatedLabel}
-              </span>
-              <button onClick={onManualRefresh} disabled={manualRefreshing} className={buttonPrimary}>
-                <svg
-                  viewBox="0 0 24 24"
-                  className={cx("h-4 w-4", manualRefreshing && "animate-spin")}
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  <path
-                    d="M20 4v6h-6"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                Refresh
+        {mobileMenuOpen ? (
+          <div className="absolute left-0 right-0 z-50 bg-neutral-900 p-3 sm:hidden">
+            <nav className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => handleSelectTab("dashboard")}
+                className={cx("w-full text-left", navButtonClass, activeTab === "dashboard" ? navActiveClass : navInactiveClass)}
+              >
+                Dashboard
               </button>
-            </>
-          ) : (
-            <span className={badgeClass}>Curated project diagrams and future media</span>
-          )}
-          {admin ? (
-            <button
-              className={cx(
-                buttonBase,
-                "h-11 w-11 min-h-11 min-w-11 shrink-0 rounded-2xl px-0",
-                "border border-emerald-300/35 bg-emerald-400 text-slate-950 hover:bg-emerald-300"
-              )}
-              onClick={onOpenAdminSession}
-              title={`Admin session: ${admin.username}`}
-              aria-label={`Admin session: ${admin.username}`}
-            >
-              <span className="inline-flex h-6 w-6 flex-none items-center justify-center">
-                <ProfileIcon />
-              </span>
-            </button>
-          ) : (
-            <button
-              className={cx(
-                buttonBase,
-                "h-11 w-11 min-h-11 min-w-11 shrink-0 rounded-2xl px-0",
-                "border border-sky-300/30 bg-sky-400 text-slate-950 hover:bg-sky-300"
-              )}
-              onClick={onOpenAdminLogin}
-              title="Admin login"
-              aria-label="Admin login"
-            >
-              <span className="inline-flex h-6 w-6 flex-none items-center justify-center">
-                <ProfileIcon />
-              </span>
-            </button>
-          )}
-        </div>
+              <button
+                type="button"
+                onClick={() => handleSelectTab("feature")}
+                className={cx("w-full text-left", navButtonClass, activeTab === "feature" ? navActiveClass : navInactiveClass)}
+              >
+                Feature
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectTab("showcase")}
+                className={cx("w-full text-left", navButtonClass, activeTab === "showcase" ? navActiveClass : navInactiveClass)}
+              >
+                Showcase
+              </button>
+            </nav>
+          </div>
+        ) : null}
       </div>
     </header>
   );

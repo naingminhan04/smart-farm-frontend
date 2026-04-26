@@ -50,15 +50,15 @@ export function AuthModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <button className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" aria-label="Close" onClick={onClose} />
-      <div className={cx(panelClass, "relative z-10 w-full max-w-md")}>
+      <button className="absolute inset-0 bg-black/75" aria-label="Close" onClick={onClose} />
+      <div className={cx(panelClass, "before:hidden relative z-10 w-full max-w-md")}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-lg font-semibold tracking-tight">
               {admin ? "Account" : authTab === "signup" ? "Create account" : "Welcome back"}
             </h3>
             <p className="mt-1 text-xs text-slate-400">
-              {admin ? "Your current admin session details." : "Use the same fields below for either sign up or login."}
+              {admin ? "Your current admin session details." : "Sign up or log in to access admin features."}
             </p>
           </div>
           {!admin ? (
@@ -76,11 +76,11 @@ export function AuthModal({
         {admin ? (
           <>
             <div className="mt-4 space-y-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="rounded-2xl border border-neutral-700/70 bg-neutral-800/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Logged In User</div>
                 <div className="mt-2 text-base font-semibold text-slate-100">{admin.username}</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="rounded-2xl border border-neutral-700/70 bg-neutral-800/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Login Method</div>
                 <div className="mt-2 flex items-center gap-2 text-base font-semibold text-slate-100">
                   {authProvider === "google" ? <GoogleLogo /> : null}
@@ -101,7 +101,7 @@ export function AuthModal({
           </>
         ) : (
           <>
-            <div className="mt-4 flex w-full items-center rounded-full border border-white/10 bg-white/5 p-1">
+            <div className="mt-4 flex w-full items-center rounded-full border border-neutral-700/70 bg-neutral-800/70 p-1">
               <button
                 onClick={() => {
                   onAuthTabChange("login");
@@ -109,7 +109,7 @@ export function AuthModal({
                 }}
                 className={cx(
                   "flex-1 rounded-full px-3 py-1 text-xs font-semibold transition",
-                  authTab === "login" ? "bg-white/10 text-slate-100" : "text-slate-300 hover:text-slate-100"
+                  authTab === "login" ? "bg-neutral-100 text-neutral-900" : "text-slate-300 hover:text-slate-100"
                 )}
                 disabled={authSubmitting}
               >
@@ -122,7 +122,7 @@ export function AuthModal({
                 }}
                 className={cx(
                   "flex-1 rounded-full px-3 py-1 text-xs font-semibold transition",
-                  authTab === "signup" ? "bg-white/10 text-slate-100" : "text-slate-300 hover:text-slate-100"
+                  authTab === "signup" ? "bg-neutral-100 text-neutral-900" : "text-slate-300 hover:text-slate-100"
                 )}
                 disabled={authSubmitting}
               >
@@ -203,7 +203,7 @@ export function AuthModal({
               <button
                 className={cx(
                   buttonBase,
-                  "w-full border border-slate-700/80 bg-[linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))] text-white hover:border-slate-500/80 hover:bg-[linear-gradient(135deg,rgba(51,65,85,0.96),rgba(15,23,42,1))]"
+                  "w-full border border-neutral-700/80 bg-neutral-900 text-neutral-100 hover:border-neutral-500/80 hover:bg-neutral-800"
                 )}
                 onClick={() => onStartOauth("github")}
                 disabled={authSubmitting}

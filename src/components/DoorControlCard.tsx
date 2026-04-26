@@ -30,8 +30,8 @@ export function DoorControlCard({ busy, doorState, onDoorChange }: DoorControlCa
           disabled={busy}
           className={cx(
             buttonBase,
-            "flex-1 border border-emerald-400/20 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/15",
-            doorState === "ON" && "ring-2 ring-emerald-400/25"
+            "flex-1 border border-neutral-200 bg-neutral-100 text-neutral-900 hover:bg-neutral-200",
+            doorState === "ON" && "ring-2 ring-neutral-200/40"
           )}
         >
           Open
@@ -41,8 +41,8 @@ export function DoorControlCard({ busy, doorState, onDoorChange }: DoorControlCa
           disabled={busy}
           className={cx(
             buttonBase,
-            "flex-1 border border-red-400/20 bg-red-400/10 text-red-100 hover:bg-red-400/15",
-            doorState === "OFF" && "ring-2 ring-red-400/25"
+            "flex-1 border border-neutral-700/80 bg-neutral-900 text-neutral-100 hover:bg-neutral-800",
+            doorState === "OFF" && "ring-2 ring-neutral-500/35"
           )}
         >
           Close

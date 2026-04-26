@@ -35,12 +35,12 @@ export function HistoryChartCard({
             {showingFull ? "Full history" : "Recent view"} ({showingFull ? totalPoints : Math.min(15, totalPoints)} points)
           </p>
         </div>
-        <div className="flex w-full items-center rounded-full border border-white/10 bg-white/5 p-1 sm:w-auto">
+        <div className="flex w-full items-center rounded-full border border-neutral-700/70 bg-neutral-800/70 p-1 sm:w-auto">
           <button
             onClick={onShowRecent}
             className={cx(
               "flex-1 rounded-full px-3 py-1 text-xs font-semibold transition sm:flex-none",
-              showingFull ? "text-slate-300 hover:text-slate-100" : "bg-white/10 text-slate-100"
+              showingFull ? "text-slate-300 hover:text-slate-100" : "bg-neutral-100 text-neutral-900"
             )}
           >
             Recent
@@ -49,7 +49,7 @@ export function HistoryChartCard({
             onClick={onShowFull}
             className={cx(
               "flex-1 rounded-full px-3 py-1 text-xs font-semibold transition sm:flex-none",
-              showingFull ? "bg-white/10 text-slate-100" : "text-slate-300 hover:text-slate-100"
+              showingFull ? "bg-neutral-100 text-neutral-900" : "text-slate-300 hover:text-slate-100"
             )}
           >
             Full

@@ -131,9 +131,13 @@ function ImageViewerModal({
   onWheelZoom: (deltaY: number) => void;
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<{ pointerId: number; startX: number; startY: number; startScrollLeft: number; startScrollTop: number } | null>(
+    null
+  );
   const [naturalSize, setNaturalSize] = useState<NaturalSize | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [baseFitSize, setBaseFitSize] = useState<BaseFitSize | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     if (!item || !viewportRef.current) return;
@@ -194,11 +198,47 @@ function ImageViewerModal({
   const canvasHeight =
     imageHeight && viewportSize.height > 0 ? Math.max(imageHeight, viewportSize.height) : viewportSize.height || undefined;
 
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0 || !viewportRef.current) return;
+
+    const element = viewportRef.current;
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startScrollLeft: element.scrollLeft,
+      startScrollTop: element.scrollTop
+    };
+    element.setPointerCapture(event.pointerId);
+    setIsDragging(true);
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!viewportRef.current || !dragStateRef.current) return;
+    if (dragStateRef.current.pointerId !== event.pointerId) return;
+
+    const element = viewportRef.current;
+    const deltaX = event.clientX - dragStateRef.current.startX;
+    const deltaY = event.clientY - dragStateRef.current.startY;
+
+    element.scrollLeft = dragStateRef.current.startScrollLeft - deltaX;
+    element.scrollTop = dragStateRef.current.startScrollTop - deltaY;
+  }
+
+  function stopDragging(event: React.PointerEvent<HTMLDivElement>) {
+    if (!viewportRef.current || !dragStateRef.current) return;
+    if (dragStateRef.current.pointerId !== event.pointerId) return;
+
+    viewportRef.current.releasePointerCapture(event.pointerId);
+    dragStateRef.current = null;
+    setIsDragging(false);
+  }
+
   return (
     <div className="fixed inset-0 z-50 overscroll-none bg-slate-950/96 backdrop-blur-md">
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
       <div className="relative z-10 flex h-screen w-screen flex-col overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-slate-950/85 px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-700/70 bg-slate-950/85 px-4 py-3 sm:px-5">
           <div>
             <p className="text-sm font-semibold text-white">{item.title}</p>
             <p className="text-xs text-slate-400">Full-screen image viewer.</p>
@@ -207,7 +247,7 @@ function ImageViewerModal({
             <a href={item.downloadUrl || item.imageUrl} target="_blank" rel="noreferrer" className={buttonMuted}>
               Download
             </a>
-            <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200">
+            <span className="rounded-xl border border-neutral-700/70 bg-neutral-800/70 px-3 py-2 text-sm font-semibold text-slate-200">
               {Math.round(zoom * 100)}%
             </span>
             <button type="button" onClick={onClose} className={buttonMuted}>
@@ -219,9 +259,14 @@ function ImageViewerModal({
         <div
           ref={viewportRef}
           className="min-h-0 flex-1 overflow-y-auto overscroll-none bg-[radial-gradient(circle_at_center,rgba(30,41,59,0.45),rgba(2,6,23,0.98))]"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={stopDragging}
+          onPointerCancel={stopDragging}
           style={{
             overflowX: needsHorizontalScroll ? "auto" : "hidden",
-            scrollbarGutter: "stable both-edges"
+            scrollbarGutter: "stable both-edges",
+            cursor: isDragging ? "grabbing" : "grab"
           }}
         >
           <div className="min-h-full min-w-full">
@@ -237,7 +282,7 @@ function ImageViewerModal({
               <img
                 src={item.imageUrl}
                 alt={item.alt}
-                className="max-h-full max-w-full select-none rounded-2xl border border-white/10 object-contain shadow-[0_20px_80px_rgba(0,0,0,0.35)]"
+                className="max-h-full max-w-full select-none rounded-2xl border border-neutral-700/70 object-contain shadow-[0_20px_80px_rgba(0,0,0,0.35)]"
                 draggable={false}
                 onLoad={(event) =>
                   setNaturalSize({
@@ -362,28 +407,27 @@ export function ShowcaseSection() {
               <div className="animate-fade-up">
                 <span className={badgeClass}>Showcase Tab</span>
                 <h2 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-white sm:text-[2.4rem]">
-                  A cleaner project story, now ready for Cloudinary media.
+                  Project gallery
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
-                  This section now reads a frontend manifest and builds Cloudinary delivery URLs at runtime, so you can
-                  swap diagrams, add videos, and keep the component code untouched.
+                  Browse key diagrams and media from the Smart Farm project.
                 </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
+                <div className="rounded-2xl border border-neutral-700/70 bg-neutral-800/70 p-4 backdrop-blur-xl">
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200/80">Published media</p>
                   <p className="mt-2 text-2xl font-semibold text-white">{showcaseMedia.length}</p>
                   <p className="mt-1 text-sm text-slate-300">
                     {imageCount} image{imageCount === 1 ? "" : "s"} and {videoCount} video{videoCount === 1 ? "" : "s"} ready.
                   </p>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
+                <div className="rounded-2xl border border-neutral-700/70 bg-neutral-800/70 p-4 backdrop-blur-xl">
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-200/80">Cloudinary</p>
                   <p className="mt-2 text-sm font-semibold text-white">
-                    {hasCloudinaryConfig() ? `Connected to ${cloudName}` : "Waiting for VITE_CLOUDINARY_CLOUD_NAME"}
+                    {hasCloudinaryConfig() ? `Connected to ${cloudName}` : "Media connection not configured"}
                   </p>
-                  <p className="mt-1 text-sm text-slate-300">Media comes from `public/showcase-media.json` instead of bundled imports.</p>
+                  <p className="mt-1 text-sm text-slate-300">Add your media setup to enable gallery items.</p>
                 </div>
               </div>
             </div>
@@ -404,7 +448,7 @@ export function ShowcaseSection() {
               {walkthroughSteps.map((step, index) => (
                 <div
                   key={step}
-                  className="flex gap-4 rounded-2xl border border-white/10 bg-slate-950/35 p-4 transition hover:border-sky-300/20 hover:bg-slate-950/50"
+                  className="flex gap-4 rounded-2xl border border-neutral-700/70 bg-slate-950/35 p-4 transition hover:border-blue-300/20 hover:bg-slate-950/50"
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-400/15 text-sm font-semibold text-sky-200">
                     {index + 1}
@@ -429,7 +473,7 @@ export function ShowcaseSection() {
               ))}
             </div>
 
-            <div className="mt-6 rounded-2xl border border-dashed border-white/12 bg-white/[0.03] p-4">
+            <div className="mt-6 rounded-2xl border border-dashed border-neutral-700/70 bg-neutral-800/40 p-4">
               <p className="text-sm font-semibold text-white">Image viewer and video-ready structure</p>
               <p className="mt-2 text-sm leading-7 text-slate-300">
                 Images open in a zoomable viewer with a Cloudinary download action. Videos render in the same showcase
@@ -450,28 +494,28 @@ export function ShowcaseSection() {
             </div>
 
             <div className="mt-5 grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <p className="text-sm font-semibold text-white">1. Set your cloud name</p>
+              <div className="rounded-2xl border border-neutral-700/70 bg-slate-950/35 p-4">
+                <p className="text-sm font-semibold text-white">1. Connect media storage</p>
                 <p className="mt-2 text-sm leading-7 text-slate-300">
-                  Add `VITE_CLOUDINARY_CLOUD_NAME=your-cloud-name` to your frontend env file so the app can generate media URLs.
+                  Set your media service configuration for this app.
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <p className="text-sm font-semibold text-white">2. Publish items in the manifest</p>
+              <div className="rounded-2xl border border-neutral-700/70 bg-slate-950/35 p-4">
+                <p className="text-sm font-semibold text-white">2. Add gallery items</p>
                 <p className="mt-2 text-sm leading-7 text-slate-300">
-                  Open `frontend/public/showcase-media.json`, paste each asset public ID, and set `published` to `true`.
+                  Add image or video entries so they can appear in the showcase.
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <p className="text-sm font-semibold text-white">3. Keep videos light</p>
+              <div className="rounded-2xl border border-neutral-700/70 bg-slate-950/35 p-4">
+                <p className="text-sm font-semibold text-white">3. Optimize videos</p>
                 <p className="mt-2 text-sm leading-7 text-slate-300">
-                  Future videos will use the same manifest. Add a `posterPublicId` if you want a custom thumbnail before playback.
+                  Use lightweight files and a thumbnail for smooth playback.
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <p className="text-sm font-semibold text-white">4. Use the viewer tools</p>
+              <div className="rounded-2xl border border-neutral-700/70 bg-slate-950/35 p-4">
+                <p className="text-sm font-semibold text-white">4. Use the viewer</p>
                 <p className="mt-2 text-sm leading-7 text-slate-300">
-                  Published images automatically get zoomable preview and a Cloudinary-powered download button.
+                  Open an image to zoom, drag, and download.
                 </p>
               </div>
             </div>
@@ -505,7 +549,7 @@ export function ShowcaseSection() {
               className={`${panelClass} overflow-hidden p-0 ${index % 2 === 1 ? "lg:[&_.showcase-copy]:order-2" : ""}`}
             >
               <div className="grid gap-0 lg:grid-cols-[1.2fr_0.9fr]">
-                <div className="relative overflow-hidden border-b border-white/10 lg:border-b-0 lg:border-r">
+                <div className="relative overflow-hidden border-b border-neutral-700/70 lg:border-b-0 lg:border-r">
                   <div className={`absolute inset-0 bg-gradient-to-br ${item.accentClass}`} />
                   {item.kind === "image" ? (
                     <button
@@ -519,7 +563,7 @@ export function ShowcaseSection() {
                         className="relative h-full w-full object-cover object-top transition duration-300 group-hover:scale-[1.02]"
                         loading="lazy"
                       />
-                      <div className="absolute inset-x-4 bottom-4 flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 backdrop-blur-xl">
+                      <div className="absolute inset-x-4 bottom-4 flex items-center justify-between rounded-2xl border border-neutral-700/70 bg-slate-950/70 px-4 py-3 backdrop-blur-xl">
                         <div>
                           <p className="text-sm font-semibold text-white">Open image viewer</p>
                           <p className="text-xs text-slate-300">Zoom in and inspect the full diagram.</p>
@@ -569,7 +613,7 @@ export function ShowcaseSection() {
                     {item.points.map((point) => (
                       <div
                         key={point}
-                        className="rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm leading-7 text-slate-300"
+                        className="rounded-2xl border border-neutral-700/70 bg-slate-950/30 px-4 py-3 text-sm leading-7 text-slate-300"
                       >
                         {point}
                       </div>
