@@ -33,11 +33,15 @@ import { DashboardHeader } from "./components/DashboardHeader";
 import { DoorControlCard } from "./components/DoorControlCard";
 import { HistoryChartCard } from "./components/HistoryChartCard";
 import { MetricCard } from "./components/MetricCard";
+import { ShowcaseSection } from "./components/ShowcaseSection";
 import type { AdminUser, OAuthProvider, TempHumiRecord } from "./types";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
+type AppTab = "dashboard" | "showcase";
+
 function App() {
+  const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
   const [latest, setLatest] = useState<TempHumiRecord | null>(null);
   const [history, setHistory] = useState<TempHumiRecord[]>([]);
   const [doorState, setDoorStateValue] = useState("OFF");
@@ -458,77 +462,87 @@ function App() {
 
       <div className="relative mx-auto max-w-[1200px] px-4 py-6 sm:px-6">
         <DashboardHeader
+          activeTab={activeTab}
           admin={admin}
           lastUpdatedLabel={lastUpdatedLabel}
           manualRefreshing={manualRefreshing}
+          onTabChange={setActiveTab}
           onManualRefresh={() => loadData({ manual: true })}
           onOpenAdminSession={openAdminSession}
           onOpenAdminLogin={() => openAdminLogin()}
         />
 
-        {error && (
-          <div className="mb-6 animate-fade-up rounded-2xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-sm text-red-100 backdrop-blur-xl">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 h-2.5 w-2.5 rounded-full bg-red-300" />
-              <div className="flex-1">{error}</div>
-            </div>
-          </div>
+        {activeTab === "dashboard" ? (
+          <>
+            {error && (
+              <div className="mb-6 animate-fade-up rounded-2xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-sm text-red-100 backdrop-blur-xl">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 h-2.5 w-2.5 rounded-full bg-red-300" />
+                  <div className="flex-1">{error}</div>
+                </div>
+              </div>
+            )}
+
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <MetricCard title="Temperature" value={latest?.temperature?.toFixed(1) ?? "--"} unit="C" />
+              <MetricCard
+                title="Humidity"
+                value={latest?.humidity?.toFixed(0) ?? "--"}
+                unit="%"
+                animationDelayClass="[animation-delay:70ms]"
+              />
+              <DoorControlCard busy={busy} doorState={doorState} onDoorChange={handleDoor} />
+            </section>
+
+            <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <HistoryChartCard
+                title="Temperature Chart"
+                totalPoints={history.length}
+                showingFull={showTempFull}
+                recentData={tempRecentData}
+                fullData={tempFullData}
+                options={chartOptions}
+                onShowRecent={() => setShowTempFull(false)}
+                onShowFull={() => setShowTempFull(true)}
+              />
+              <HistoryChartCard
+                title="Humidity Chart"
+                totalPoints={history.length}
+                showingFull={showHumiFull}
+                recentData={humiRecentData}
+                fullData={humiFullData}
+                options={chartOptions}
+                animationDelayClass="[animation-delay:80ms]"
+                onShowRecent={() => setShowHumiFull(false)}
+                onShowFull={() => setShowHumiFull(true)}
+              />
+            </section>
+
+            <CardsPanel
+              admin={admin}
+              authChecking={authChecking}
+              cardSubmitting={cardSubmitting}
+              cards={cards}
+              editingCardNum={editingCardNum}
+              editingValue={editingValue}
+              newCardNum={newCardNum}
+              onAddCard={handleAddCard}
+              onDeleteCard={handleDeleteCard}
+              onEditCard={handleStartEdit}
+              onNewCardNumChange={setNewCardNum}
+              onSaveEdit={handleSaveEdit}
+              onCancelEdit={resetCardEditing}
+              onEditingValueChange={setEditingValue}
+            />
+          </>
+        ) : (
+          <ShowcaseSection />
         )}
 
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <MetricCard title="Temperature" value={latest?.temperature?.toFixed(1) ?? "--"} unit="C" />
-          <MetricCard
-            title="Humidity"
-            value={latest?.humidity?.toFixed(0) ?? "--"}
-            unit="%"
-            animationDelayClass="[animation-delay:70ms]"
-          />
-          <DoorControlCard busy={busy} doorState={doorState} onDoorChange={handleDoor} />
-        </section>
-
-        <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <HistoryChartCard
-            title="Temperature Chart"
-            totalPoints={history.length}
-            showingFull={showTempFull}
-            recentData={tempRecentData}
-            fullData={tempFullData}
-            options={chartOptions}
-            onShowRecent={() => setShowTempFull(false)}
-            onShowFull={() => setShowTempFull(true)}
-          />
-          <HistoryChartCard
-            title="Humidity Chart"
-            totalPoints={history.length}
-            showingFull={showHumiFull}
-            recentData={humiRecentData}
-            fullData={humiFullData}
-            options={chartOptions}
-            animationDelayClass="[animation-delay:80ms]"
-            onShowRecent={() => setShowHumiFull(false)}
-            onShowFull={() => setShowHumiFull(true)}
-          />
-        </section>
-
-        <CardsPanel
-          admin={admin}
-          authChecking={authChecking}
-          cardSubmitting={cardSubmitting}
-          cards={cards}
-          editingCardNum={editingCardNum}
-          editingValue={editingValue}
-          newCardNum={newCardNum}
-          onAddCard={handleAddCard}
-          onDeleteCard={handleDeleteCard}
-          onEditCard={handleStartEdit}
-          onNewCardNumChange={setNewCardNum}
-          onSaveEdit={handleSaveEdit}
-          onCancelEdit={resetCardEditing}
-          onEditingValueChange={setEditingValue}
-        />
-
         <footer className="pb-2 pt-6 text-xs text-slate-500">
-          Smart Farm Dashboard. UI refreshes automatically; manual refresh available above.
+          {activeTab === "dashboard"
+            ? "Smart Farm Dashboard. UI refreshes automatically; manual refresh available above."
+            : "Smart Farm Showcase. Diagrams are curated in the frontend now, and videos or more images can be added later."}
         </footer>
       </div>
 

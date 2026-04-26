@@ -4,18 +4,22 @@ import { badgeClass, buttonBase, buttonPrimary } from "./ui";
 import { cx } from "./utils";
 
 type DashboardHeaderProps = {
+  activeTab: "dashboard" | "showcase";
   admin: AdminUser | null;
   lastUpdatedLabel: string;
   manualRefreshing: boolean;
+  onTabChange: (tab: "dashboard" | "showcase") => void;
   onManualRefresh: () => void;
   onOpenAdminSession: () => void;
   onOpenAdminLogin: () => void;
 };
 
 export function DashboardHeader({
+  activeTab,
   admin,
   lastUpdatedLabel,
   manualRefreshing,
+  onTabChange,
   onManualRefresh,
   onOpenAdminSession,
   onOpenAdminLogin
@@ -46,37 +50,65 @@ export function DashboardHeader({
             <p className="mt-1 text-sm text-slate-300">
               Live environment telemetry, access control, and door automation.
             </p>
+            <div className="mt-4 inline-flex rounded-2xl border border-white/10 bg-slate-900/70 p-1 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
+              <button
+                type="button"
+                onClick={() => onTabChange("dashboard")}
+                className={cx(
+                  "rounded-xl px-4 py-2 text-sm font-semibold transition",
+                  activeTab === "dashboard" ? "bg-sky-400 text-slate-950" : "text-slate-300 hover:bg-white/5"
+                )}
+              >
+                Dashboard
+              </button>
+              <button
+                type="button"
+                onClick={() => onTabChange("showcase")}
+                className={cx(
+                  "rounded-xl px-4 py-2 text-sm font-semibold transition",
+                  activeTab === "showcase" ? "bg-emerald-400 text-slate-950" : "text-slate-300 hover:bg-white/5"
+                )}
+              >
+                Showcase
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="animate-fade-up [animation-delay:80ms]">
         <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-          <span className={badgeClass}>
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-soft-pulse rounded-full bg-emerald-400/70" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-            </span>
-            Updated: {lastUpdatedLabel}
-          </span>
-          <button onClick={onManualRefresh} disabled={manualRefreshing} className={buttonPrimary}>
-            <svg
-              viewBox="0 0 24 24"
-              className={cx("h-4 w-4", manualRefreshing && "animate-spin")}
-              fill="none"
-              aria-hidden="true"
-            >
-              <path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              <path
-                d="M20 4v6h-6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Refresh
-          </button>
+          {activeTab === "dashboard" ? (
+            <>
+              <span className={badgeClass}>
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-soft-pulse rounded-full bg-emerald-400/70" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                </span>
+                Updated: {lastUpdatedLabel}
+              </span>
+              <button onClick={onManualRefresh} disabled={manualRefreshing} className={buttonPrimary}>
+                <svg
+                  viewBox="0 0 24 24"
+                  className={cx("h-4 w-4", manualRefreshing && "animate-spin")}
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path
+                    d="M20 4v6h-6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Refresh
+              </button>
+            </>
+          ) : (
+            <span className={badgeClass}>Curated project diagrams and future media</span>
+          )}
           {admin ? (
             <button
               className={cx(

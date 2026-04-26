@@ -9,12 +9,14 @@
 
 html {
   background-color: #020617;
+  overscroll-behavior: none;
 }
 
 body {
   min-height: 100vh;
   background-color: #020617;
   color: #f8fafc;
+  overscroll-behavior: none;
 }
 
 #root {

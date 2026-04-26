@@ -1,0 +1,63 @@
+{
+  "items": [
+    {
+      "id": "system-flowchart",
+      "kind": "image",
+      "title": "System Flowchart",
+      "caption": "This diagram shows the full control logic of the smart farm, from startup and sensor reads to access control, lighting, humidifier behavior, alerts, display updates, and cloud upload.",
+      "alt": "Smart agriculture system flowchart",
+      "publicId": "Smart_Farm_eu42xu",
+      "format": "png",
+      "version": "",
+      "downloadFileName": "smart-farm-flowchart",
+      "published": true,
+      "accent": "sky",
+      "points": [
+        "The ESP32 starts by initializing the DHT11, LDR sensors, RFID reader, LCD display, relay, servo, LEDs, and humidifier modules.",
+        "The system continuously checks RFID access, temperature and humidity status, ambient darkness, and the laser fence condition.",
+        "If the environment needs correction, the humidifier and lighting actions are triggered automatically without manual input.",
+        "If an unauthorized card or fence interruption is detected, the system keeps the gate closed and raises an alert.",
+        "Each loop ends by updating the display and sending the latest monitoring data to the IoT cloud."
+      ]
+    },
+    {
+      "id": "circuit-diagram",
+      "kind": "image",
+      "title": "Circuit Diagram",
+      "caption": "This hardware layout shows how the ESP32 is connected to the LCD, RFID reader, DHT11, LDR modules, relay, servo, power module, water pump, lighting LEDs, and laser fence parts.",
+      "alt": "Smart agriculture circuit diagram",
+      "publicId": "Circuit_Diagram_iwge3e",
+      "format": "jpg",
+      "version": "",
+      "downloadFileName": "smart-farm-circuit-diagram",
+      "published": true,
+      "accent": "emerald",
+      "points": [
+        "The ESP32 acts as the controller and coordinates all sensing, security, and automation decisions.",
+        "The relay module switches the humidifier path, while the servo motor controls the gate movement after RFID authorization.",
+        "The fence lighting LEDs and farm lighting LEDs are separated so visibility and environmental lighting can be managed independently.",
+        "The XL4016 step-down module helps regulate the power path from the battery to the lower-voltage components in the system.",
+        "The laser module and LDR pair work together as a virtual fence for intrusion detection."
+      ]
+    },
+    {
+      "id": "future-demo-video",
+      "kind": "video",
+      "title": "Future Demo Video",
+      "caption": "This placeholder shows the structure for later Cloudinary video uploads. Publish it when you have a demo clip ready.",
+      "publicId": "replace-with-your-cloudinary-video-public-id",
+      "format": "mp4",
+      "version": "",
+      "posterPublicId": "",
+      "posterFormat": "jpg",
+      "posterVersion": "",
+      "published": false,
+      "accent": "amber",
+      "points": [
+        "Videos will render with a native player and Cloudinary delivery URL.",
+        "You can optionally set a posterPublicId for a custom thumbnail.",
+        "Keep preload light so the showcase stays fast."
+      ]
+    }
+  ]
+}
