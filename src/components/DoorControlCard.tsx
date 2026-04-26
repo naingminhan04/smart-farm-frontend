@@ -1,12 +1,6 @@
-import type { DoorState } from "../types";
+import type { DoorControlCardProps } from "../types";
 import { badgeClass, buttonBase, panelClass } from "./ui";
 import { cx } from "./utils";
-
-type DoorControlCardProps = {
-  busy: boolean;
-  doorState: string;
-  onDoorChange: (state: DoorState) => void;
-};
 
 export function DoorControlCard({ busy, doorState, onDoorChange }: DoorControlCardProps) {
   return (

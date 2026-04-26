@@ -1,30 +1,7 @@
-import type { AdminUser, OAuthProvider } from "../types";
+import type { AuthModalProps } from "../types";
 import { GitHubLogo, GoogleLogo } from "./icons";
 import { buttonBase, buttonDanger, buttonMuted, buttonPrimary, inputClass, panelClass } from "./ui";
 import { cx } from "./utils";
-
-type AuthTab = "login" | "signup";
-
-type AuthModalProps = {
-  admin: AdminUser | null;
-  authError: string | null;
-  authMethodLabel: string;
-  authPassword: string;
-  authProvider: OAuthProvider | "password" | null;
-  authSubmitting: boolean;
-  authTab: AuthTab;
-  authUsername: string;
-  isOpen: boolean;
-  onAuthPasswordChange: (value: string) => void;
-  onAuthTabChange: (tab: AuthTab) => void;
-  onAuthUsernameChange: (value: string) => void;
-  onClose: () => void;
-  onLogin: () => void;
-  onLogout: () => void;
-  onRegister: () => void;
-  onStartOauth: (provider: OAuthProvider) => void;
-  onClearAuthError: () => void;
-};
 
 export function AuthModal({
   admin,
@@ -69,7 +46,7 @@ export function AuthModal({
         </div>
 
         {authError && (
-          <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-sm text-red-100">
+          <div className="mt-4 w-full rounded-xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-sm text-red-100">
             {authError}
           </div>
         )}

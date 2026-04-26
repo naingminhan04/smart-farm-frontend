@@ -1,12 +1,6 @@
+import type { MetricCardProps } from "../types";
 import { badgeClass, panelClass } from "./ui";
 import { cx } from "./utils";
-
-type MetricCardProps = {
-  title: string;
-  value: string;
-  unit: string;
-  animationDelayClass?: string;
-};
 
 export function MetricCard({ title, value, unit, animationDelayClass }: MetricCardProps) {
   return (

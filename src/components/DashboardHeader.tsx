@@ -1,15 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { AdminUser } from "../types";
+import type { AppTab, DashboardHeaderProps } from "../types";
 import { cx } from "./utils";
-
-type DashboardHeaderProps = {
-  activeTab: "dashboard" | "feature" | "showcase";
-  admin: AdminUser | null;
-  onTabChange: (tab: "dashboard" | "feature" | "showcase") => void;
-  onLogout: () => void;
-  onOpenAdminSession: () => void;
-  onOpenAdminLogin: () => void;
-};
 
 export function DashboardHeader({
   activeTab,
@@ -26,7 +17,7 @@ export function DashboardHeader({
   const navActiveClass = "text-white";
   const navInactiveClass = "text-slate-400 hover:text-slate-200";
 
-  function handleSelectTab(tab: "dashboard" | "feature" | "showcase") {
+  function handleSelectTab(tab: AppTab) {
     onTabChange(tab);
     setMobileMenuOpen(false);
   }
@@ -89,14 +80,21 @@ export function DashboardHeader({
             <button
               type="button"
               onClick={() => setMobileMenuOpen((open) => !open)}
-              className="inline-flex items-center rounded-md border border-slate-700 bg-[#11161d] px-2 py-1.5 text-xs font-medium text-slate-200"
+              className="inline-flex items-center rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-xs font-medium text-slate-200"
               aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
             >
-              <span className="flex h-3.5 w-3.5 flex-col justify-between">
-                <span className="h-px w-full bg-slate-300" />
-                <span className="h-px w-full bg-slate-300" />
-                <span className="h-px w-full bg-slate-300" />
-              </span>
+              {mobileMenuOpen ? (
+                <span className="relative block h-3.5 w-3.5">
+                  <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 rotate-45 bg-slate-300" />
+                  <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 -rotate-45 bg-slate-300" />
+                </span>
+              ) : (
+                <span className="flex h-3.5 w-3.5 flex-col justify-between">
+                  <span className="h-px w-full bg-slate-300" />
+                  <span className="h-px w-full bg-slate-300" />
+                  <span className="h-px w-full bg-slate-300" />
+                </span>
+              )}
             </button>
           </div>
 

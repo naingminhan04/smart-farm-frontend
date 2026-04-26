@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -28,18 +29,16 @@ import {
   setDoorState
 } from "./api";
 import { AuthModal } from "./components/AuthModal";
-import { CardsPanel } from "./components/CardsPanel";
+import { DashboardOverview } from "./components/DashboardOverview";
 import { DashboardHeader } from "./components/DashboardHeader";
-import { DoorControlCard } from "./components/DoorControlCard";
 import { FeatureSection } from "./components/FeatureSection";
-import { HistoryChartCard } from "./components/HistoryChartCard";
-import { MetricCard } from "./components/MetricCard";
 import { ShowcasePlaceholderSection } from "./components/ShowcasePlaceholderSection";
-import type { AdminUser, OAuthProvider, TempHumiRecord } from "./types";
+import { getAuthActionErrorMessage, getDashboardErrorMessage, normalizeAuthErrorMessage } from "./lib/errorMessages";
+import type { AdminUser, AppTab, OAuthProvider, TempHumiRecord } from "./types";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
-type AppTab = "dashboard" | "feature" | "showcase";
+const AUTH_PROVIDER_STORAGE_KEY = "smartfarm.authProvider";
 
 function App() {
   const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
@@ -51,9 +50,7 @@ function App() {
   const [editingCardNum, setEditingCardNum] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [cardSubmitting, setCardSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [manualRefreshing, setManualRefreshing] = useState(false);
   const [showTempFull, setShowTempFull] = useState(false);
   const [showHumiFull, setShowHumiFull] = useState(false);
 
@@ -65,7 +62,10 @@ function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [authTab, setAuthTab] = useState<"login" | "signup">("login");
-  const [authProvider, setAuthProvider] = useState<OAuthProvider | "password" | null>(null);
+  const [authProvider, setAuthProvider] = useState<OAuthProvider | "password" | null>(() => {
+    const raw = window.localStorage.getItem(AUTH_PROVIDER_STORAGE_KEY);
+    return raw === "google" || raw === "github" || raw === "password" ? raw : null;
+  });
 
   useEffect(() => {
     const applyHashTab = () => {
@@ -80,11 +80,12 @@ function App() {
     return () => window.removeEventListener("hashchange", applyHashTab);
   }, []);
 
-  async function loadData(options?: { manual?: boolean }) {
-    const isManual = options?.manual ?? false;
-    if (isManual) setManualRefreshing(true);
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [activeTab]);
+
+  async function loadData() {
     setRefreshing(true);
-    setError(null);
 
     try {
       const [latestData, historyData, stateData, cardData] = await Promise.all([
@@ -98,10 +99,11 @@ function App() {
       setDoorStateValue(stateData.state);
       setCards(cardData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data");
+      toast.error(getDashboardErrorMessage(err, "Unable to load dashboard data. Please try again."), {
+        id: "dashboard-load-error"
+      });
     } finally {
       setRefreshing(false);
-      if (isManual) setManualRefreshing(false);
     }
   }
 
@@ -127,19 +129,26 @@ function App() {
     return false;
   }
 
+  function handleUnauthorizedSession() {
+    clearAdminTokens();
+    setAdmin(null);
+    openAdminLogin("Session expired. Please login again.");
+  }
+
   async function handleDoor(state: "ON" | "OFF") {
     if (!ensureAdmin("Admin login required to control the door.")) return;
     try {
       await setDoorState(state);
       await loadData();
+      toast.success(state === "ON" ? "Door opened" : "Door closed");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        clearAdminTokens();
-        setAdmin(null);
-        openAdminLogin("Session expired. Please login again.");
+        handleUnauthorizedSession();
         return;
       }
-      setError(err instanceof Error ? err.message : "Failed to change door state");
+      toast.error(getDashboardErrorMessage(err, "Unable to update the door right now. Please try again."), {
+        id: "door-update-error"
+      });
     }
   }
 
@@ -147,24 +156,24 @@ function App() {
     if (!ensureAdmin()) return;
     const cardNum = newCardNum.trim().toUpperCase();
     if (!cardNum) {
-      setError("Card number cannot be empty");
+      toast.error("Card number cannot be empty");
       return;
     }
 
     setCardSubmitting(true);
-    setError(null);
     try {
       await addCard(cardNum);
       setNewCardNum("");
       await loadData();
+      toast.success("Card added");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        clearAdminTokens();
-        setAdmin(null);
-        openAdminLogin("Session expired. Please login again.");
+        handleUnauthorizedSession();
         return;
       }
-      setError(err instanceof Error ? err.message : "Failed to add card");
+      toast.error(getDashboardErrorMessage(err, "Unable to add the card right now. Please try again."), {
+        id: "card-add-error"
+      });
     } finally {
       setCardSubmitting(false);
     }
@@ -174,24 +183,24 @@ function App() {
     if (!ensureAdmin()) return;
     const nextCardNum = editingValue.trim().toUpperCase();
     if (!nextCardNum) {
-      setError("Card number cannot be empty");
+      toast.error("Card number cannot be empty");
       return;
     }
 
     setCardSubmitting(true);
-    setError(null);
     try {
       await editCard(cardNum, nextCardNum);
       resetCardEditing();
       await loadData();
+      toast.success("Card updated");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        clearAdminTokens();
-        setAdmin(null);
-        openAdminLogin("Session expired. Please login again.");
+        handleUnauthorizedSession();
         return;
       }
-      setError(err instanceof Error ? err.message : "Failed to edit card");
+      toast.error(getDashboardErrorMessage(err, "Unable to update the card right now. Please try again."), {
+        id: "card-edit-error"
+      });
     } finally {
       setCardSubmitting(false);
     }
@@ -200,18 +209,18 @@ function App() {
   async function handleDeleteCard(cardNum: string) {
     if (!ensureAdmin()) return;
     setCardSubmitting(true);
-    setError(null);
     try {
       await deleteCard(cardNum);
       await loadData();
+      toast.success("Card deleted");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        clearAdminTokens();
-        setAdmin(null);
-        openAdminLogin("Session expired. Please login again.");
+        handleUnauthorizedSession();
         return;
       }
-      setError(err instanceof Error ? err.message : "Failed to delete card");
+      toast.error(getDashboardErrorMessage(err, "Unable to delete the card right now. Please try again."), {
+        id: "card-delete-error"
+      });
     } finally {
       setCardSubmitting(false);
     }
@@ -243,6 +252,10 @@ function App() {
         const me = await adminMe();
         if (!cancelled) {
           setAdmin(me.admin ? { id: me.admin.id, username: me.admin.username } : null);
+          if (me.admin) {
+            const raw = window.localStorage.getItem(AUTH_PROVIDER_STORAGE_KEY);
+            if (raw === "google" || raw === "github" || raw === "password") setAuthProvider(raw);
+          }
         }
       } catch {
         clearAdminTokens();
@@ -270,7 +283,7 @@ function App() {
       const error = params.get("error") || "";
 
       if (error) {
-        setAuthError(error);
+        setAuthError(normalizeAuthErrorMessage(error) ?? "OAuth login could not be completed.");
         setIsAuthOpen(true);
         window.history.replaceState({}, "", "/");
         return;
@@ -290,7 +303,9 @@ function App() {
 
         if (me.admin) {
           setAdmin({ id: me.admin.id, username: me.admin.username });
-          setAuthProvider((params.get("provider") as OAuthProvider | null) || null);
+          const provider = (params.get("provider") as OAuthProvider | null) || null;
+          setAuthProvider(provider);
+          if (provider) window.localStorage.setItem(AUTH_PROVIDER_STORAGE_KEY, provider);
           setAuthError(null);
           setIsAuthOpen(false);
         } else {
@@ -329,16 +344,11 @@ function App() {
       setAdminTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
       setAdmin(result.admin);
       setAuthProvider("password");
+      window.localStorage.setItem(AUTH_PROVIDER_STORAGE_KEY, "password");
       setAuthPassword("");
       setIsAuthOpen(false);
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.status === 401) setAuthError("Invalid username or password.");
-        else if (err.status === 400) setAuthError("Username and password are required.");
-        else setAuthError(`Login failed (${err.status}).`);
-      } else {
-        setAuthError(err instanceof Error ? err.message : "Login failed.");
-      }
+      setAuthError(getAuthActionErrorMessage("login", err));
     } finally {
       setAuthSubmitting(false);
     }
@@ -358,19 +368,11 @@ function App() {
       setAdminTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
       setAdmin(result.admin);
       setAuthProvider("password");
+      window.localStorage.setItem(AUTH_PROVIDER_STORAGE_KEY, "password");
       setAuthPassword("");
       setIsAuthOpen(false);
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.status === 400) setAuthError("Username must be 3-64 characters and password at least 8 characters.");
-        else if (err.status === 409) {
-          setAuthError("That username is already taken. Please choose another or sign in.");
-        } else {
-          setAuthError(`Sign up failed (${err.status}).`);
-        }
-      } else {
-        setAuthError(err instanceof Error ? err.message : "Sign up failed.");
-      }
+      setAuthError(getAuthActionErrorMessage("signup", err));
     } finally {
       setAuthSubmitting(false);
     }
@@ -392,15 +394,13 @@ function App() {
       clearAdminTokens();
       setAdmin(null);
       setAuthProvider(null);
+      window.localStorage.removeItem(AUTH_PROVIDER_STORAGE_KEY);
       setIsAuthOpen(false);
       resetCardEditing();
     }
   }
 
   const busy = refreshing || cardSubmitting;
-  const lastUpdated = latest?.updatedTime ? new Date(latest.updatedTime) : null;
-  const lastUpdatedLabel = lastUpdated ? lastUpdated.toLocaleString() : "No data yet";
-
   const authMethodLabel =
     authProvider === "google"
       ? "Google"
@@ -441,7 +441,7 @@ function App() {
     [history]
   );
   const humiFullData = useMemo(
-    () => buildChartData(history, "humidity", "Humidity (Full)", "#38bdf8"),
+    () => buildChartData(history, "humidity", "Humidity (Full)", "#60a5fa"),
     [history]
   );
 
@@ -467,6 +467,22 @@ function App() {
 
   return (
     <div className="relative min-h-screen bg-neutral-900 font-sans text-neutral-100 antialiased">
+      <Toaster
+        position="bottom-center"
+        toastOptions={{
+          duration: 3400,
+          style: {
+            background: "#171717",
+            color: "#f5f5f5",
+            border: "1px solid #404040",
+            borderRadius: "12px",
+            padding: "12px 14px",
+            minWidth: "min(calc(100vw - 32px), 520px)",
+            maxWidth: "min(calc(100vw - 32px), 520px)",
+            boxSizing: "border-box"
+          }
+        }}
+      />
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-24 left-[-140px] h-[420px] w-[420px] animate-slow-float rounded-full bg-neutral-100/5 blur-3xl" />
         <div className="absolute -bottom-28 right-[-120px] h-[460px] w-[460px] animate-slow-float rounded-full bg-blue-300/10 blur-3xl [animation-delay:1.2s]" />
@@ -488,68 +504,38 @@ function App() {
         />
 
         {activeTab === "dashboard" ? (
-          <>
-            {error && (
-              <div className="mb-6 animate-fade-up rounded-2xl border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm text-neutral-900 backdrop-blur-xl">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 h-2.5 w-2.5 rounded-full bg-neutral-500" />
-                  <div className="flex-1">{error}</div>
-                </div>
-              </div>
-            )}
-
-            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <MetricCard title="Temperature" value={latest?.temperature?.toFixed(1) ?? "--"} unit="C" />
-              <MetricCard
-                title="Humidity"
-                value={latest?.humidity?.toFixed(0) ?? "--"}
-                unit="%"
-                animationDelayClass="[animation-delay:70ms]"
-              />
-              <DoorControlCard busy={busy} doorState={doorState} onDoorChange={handleDoor} />
-            </section>
-
-            <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <HistoryChartCard
-                title="Temperature Chart"
-                totalPoints={history.length}
-                showingFull={showTempFull}
-                recentData={tempRecentData}
-                fullData={tempFullData}
-                options={chartOptions}
-                onShowRecent={() => setShowTempFull(false)}
-                onShowFull={() => setShowTempFull(true)}
-              />
-              <HistoryChartCard
-                title="Humidity Chart"
-                totalPoints={history.length}
-                showingFull={showHumiFull}
-                recentData={humiRecentData}
-                fullData={humiFullData}
-                options={chartOptions}
-                animationDelayClass="[animation-delay:80ms]"
-                onShowRecent={() => setShowHumiFull(false)}
-                onShowFull={() => setShowHumiFull(true)}
-              />
-            </section>
-
-            <CardsPanel
-              admin={admin}
-              authChecking={authChecking}
-              cardSubmitting={cardSubmitting}
-              cards={cards}
-              editingCardNum={editingCardNum}
-              editingValue={editingValue}
-              newCardNum={newCardNum}
-              onAddCard={handleAddCard}
-              onDeleteCard={handleDeleteCard}
-              onEditCard={handleStartEdit}
-              onNewCardNumChange={setNewCardNum}
-              onSaveEdit={handleSaveEdit}
-              onCancelEdit={resetCardEditing}
-              onEditingValueChange={setEditingValue}
-            />
-          </>
+          <DashboardOverview
+            latest={latest}
+            history={history}
+            busy={busy}
+            doorState={doorState}
+            showTempFull={showTempFull}
+            showHumiFull={showHumiFull}
+            tempRecentData={tempRecentData}
+            tempFullData={tempFullData}
+            humiRecentData={humiRecentData}
+            humiFullData={humiFullData}
+            chartOptions={chartOptions}
+            admin={admin}
+            authChecking={authChecking}
+            cardSubmitting={cardSubmitting}
+            cards={cards}
+            editingCardNum={editingCardNum}
+            editingValue={editingValue}
+            newCardNum={newCardNum}
+            onDoorChange={handleDoor}
+            onShowTempRecent={() => setShowTempFull(false)}
+            onShowTempFull={() => setShowTempFull(true)}
+            onShowHumiRecent={() => setShowHumiFull(false)}
+            onShowHumiFull={() => setShowHumiFull(true)}
+            onAddCard={handleAddCard}
+            onDeleteCard={handleDeleteCard}
+            onEditCard={handleStartEdit}
+            onNewCardNumChange={setNewCardNum}
+            onSaveEdit={handleSaveEdit}
+            onCancelEdit={resetCardEditing}
+            onEditingValueChange={setEditingValue}
+          />
         ) : activeTab === "feature" ? (
           <FeatureSection />
         ) : (

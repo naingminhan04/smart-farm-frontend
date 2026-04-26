@@ -1,19 +1,7 @@
-import type { ChartData, ChartOptions } from "chart.js";
 import { Line } from "react-chartjs-2";
+import type { HistoryChartCardProps } from "../types";
 import { panelClass } from "./ui";
 import { cx } from "./utils";
-
-type HistoryChartCardProps = {
-  title: string;
-  totalPoints: number;
-  showingFull: boolean;
-  recentData: ChartData<"line">;
-  fullData: ChartData<"line">;
-  options: ChartOptions<"line">;
-  animationDelayClass?: string;
-  onShowRecent: () => void;
-  onShowFull: () => void;
-};
 
 export function HistoryChartCard({
   title,

@@ -1,23 +1,6 @@
-import type { AdminUser } from "../types";
+import type { CardsPanelProps } from "../types";
 import { badgeClass, buttonDanger, buttonMuted, buttonPrimary, inputClass, panelClass } from "./ui";
 import { cx } from "./utils";
-
-type CardsPanelProps = {
-  admin: AdminUser | null;
-  authChecking: boolean;
-  cardSubmitting: boolean;
-  cards: string[];
-  editingCardNum: string | null;
-  editingValue: string;
-  newCardNum: string;
-  onAddCard: () => void;
-  onDeleteCard: (cardNum: string) => void;
-  onEditCard: (cardNum: string) => void;
-  onNewCardNumChange: (value: string) => void;
-  onSaveEdit: (cardNum: string) => void;
-  onCancelEdit: () => void;
-  onEditingValueChange: (value: string) => void;
-};
 
 export function CardsPanel({
   admin,
