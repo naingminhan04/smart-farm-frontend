@@ -61,6 +61,7 @@ export type DashboardOverviewProps = {
   humiRecentData: ChartData<"line">;
   humiFullData: ChartData<"line">;
   chartOptions: ChartOptions<"line">;
+  chartReady: boolean;
   admin: AdminUser | null;
   authChecking: boolean;
   cardSubmitting: boolean;
@@ -108,6 +109,7 @@ export type HistoryChartCardProps = {
   recentData: ChartData<"line">;
   fullData: ChartData<"line">;
   options: ChartOptions<"line">;
+  chartReady?: boolean;
   animationDelayClass?: string;
   onShowRecent: () => void;
   onShowFull: () => void;

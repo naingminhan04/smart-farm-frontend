@@ -79,6 +79,7 @@ function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [showTempFull, setShowTempFull] = useState(false);
   const [showHumiFull, setShowHumiFull] = useState(false);
+  const [chartReady, setChartReady] = useState(false);
 
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -253,6 +254,12 @@ function App() {
     const id = window.setInterval(loadData, 5000);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (history.length === 0 || chartReady) return;
+    const id = window.setTimeout(() => setChartReady(true), 40);
+    return () => window.clearTimeout(id);
+  }, [chartReady, history.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -544,6 +551,7 @@ function App() {
             humiRecentData={humiRecentData}
             humiFullData={humiFullData}
             chartOptions={chartOptions}
+            chartReady={chartReady}
             admin={admin}
             authChecking={authChecking}
             cardSubmitting={cardSubmitting}

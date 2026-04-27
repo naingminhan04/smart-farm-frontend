@@ -16,6 +16,7 @@ export function DashboardOverview({
   humiRecentData,
   humiFullData,
   chartOptions,
+  chartReady,
   admin,
   authChecking,
   cardSubmitting,
@@ -57,6 +58,7 @@ export function DashboardOverview({
           recentData={tempRecentData}
           fullData={tempFullData}
           options={chartOptions}
+          chartReady={chartReady}
           onShowRecent={onShowTempRecent}
           onShowFull={onShowTempFull}
         />
@@ -67,6 +69,7 @@ export function DashboardOverview({
           recentData={humiRecentData}
           fullData={humiFullData}
           options={chartOptions}
+          chartReady={chartReady}
           animationDelayClass="[animation-delay:80ms]"
           onShowRecent={onShowHumiRecent}
           onShowFull={onShowHumiFull}

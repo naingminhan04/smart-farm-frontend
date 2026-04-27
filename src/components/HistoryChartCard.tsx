@@ -10,6 +10,7 @@ export function HistoryChartCard({
   recentData,
   fullData,
   options,
+  chartReady = true,
   animationDelayClass,
   onShowRecent,
   onShowFull
@@ -44,7 +45,12 @@ export function HistoryChartCard({
           </button>
         </div>
       </div>
-      <div className="mt-4 max-w-full">
+      <div
+        className={cx(
+          "mt-4 max-w-full transition-all duration-500 ease-out",
+          chartReady ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
+        )}
+      >
         <Line data={showingFull ? fullData : recentData} options={options} />
       </div>
     </article>
