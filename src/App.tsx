@@ -109,6 +109,38 @@ function App() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const alarmIntervalRef = useRef<number | null>(null);
 
+  async function unlockAlarmAudio() {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = getAudioContext();
+      }
+
+      const audioContext = audioContextRef.current;
+      if (!audioContext) return false;
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
+      // iPhone Safari often needs one gesture-triggered sound to fully unlock Web Audio.
+      const now = audioContext.currentTime;
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      gain.gain.setValueAtTime(0.0001, now);
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(880, now);
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.02);
+
+      setAudioUnlocked(audioContext.state === "running");
+      return audioContext.state === "running";
+    } catch {
+      return false;
+    }
+  }
+
   function clearProtectedAdminData() {
     setActiveIntruderAlert(null);
     setIntruderAlertHistory([]);
@@ -308,30 +340,20 @@ function App() {
   }, [chartReady, history.length]);
 
   useEffect(() => {
-    const unlockAudio = async () => {
-      try {
-        if (!audioContextRef.current) {
-          audioContextRef.current = getAudioContext();
-        }
-
-        if (audioContextRef.current?.state === "suspended") {
-          await audioContextRef.current.resume();
-        }
-
-        if (audioContextRef.current) {
-          setAudioUnlocked(true);
-        }
-      } catch {
-        // Ignore browser audio-lock failures and keep trying on later interactions.
-      }
+    const unlockAudio = () => {
+      void unlockAlarmAudio();
     };
 
     if (audioUnlocked) return;
 
     window.addEventListener("pointerdown", unlockAudio);
+    window.addEventListener("touchstart", unlockAudio);
+    window.addEventListener("click", unlockAudio);
     window.addEventListener("keydown", unlockAudio);
     return () => {
       window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("click", unlockAudio);
       window.removeEventListener("keydown", unlockAudio);
     };
   }, [audioUnlocked]);
@@ -346,7 +368,7 @@ function App() {
 
     const playBurst = () => {
       const audioContext = audioContextRef.current;
-      if (!audioContext) return;
+      if (!audioContext || audioContext.state !== "running") return;
 
       const now = audioContext.currentTime;
       const gain = audioContext.createGain();
@@ -827,6 +849,7 @@ function App() {
         alert={admin ? activeIntruderAlert : null}
         canPlaySound={audioUnlocked}
         busy={intruderActionSubmitting}
+        onEnableSound={() => void unlockAlarmAudio()}
         onAcknowledge={handleAcknowledgeIntruderAlert}
         onDialEmergency={handleDialEmergency}
       />

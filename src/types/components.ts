@@ -134,6 +134,7 @@ export type IntruderAlertModalProps = {
   alert: IntruderAlertRecord | null;
   canPlaySound: boolean;
   busy?: boolean;
+  onEnableSound?: () => void | Promise<void>;
   onAcknowledge: () => void;
   onDialEmergency: () => void;
 };
