@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import {
   Chart as ChartJS,
@@ -12,6 +12,7 @@ import {
 } from "chart.js";
 import {
   addCard,
+  acknowledgeIntruderAlert,
   adminLogin,
   adminLogout,
   adminMe,
@@ -25,7 +26,9 @@ import {
   getCards,
   getDoorState,
   getHistory,
+  getIntruderAlerts,
   getLatest,
+  markIntruderAlertEmergency,
   setAdminTokens,
   setDoorState
 } from "./api";
@@ -33,9 +36,10 @@ import { AuthModal } from "./components/AuthModal";
 import { DashboardOverview } from "./components/DashboardOverview";
 import { DashboardHeader } from "./components/DashboardHeader";
 import { FeatureSection } from "./components/FeatureSection";
+import { IntruderAlertModal } from "./components/IntruderAlertModal";
 import { ShowcasePlaceholderSection } from "./components/ShowcasePlaceholderSection";
 import { getAuthActionErrorMessage, getDashboardErrorMessage, normalizeAuthErrorMessage } from "./lib/errorMessages";
-import type { AdminUser, AppTab, OAuthProvider, TempHumiRecord } from "./types";
+import type { AdminUser, AppTab, IntruderAlertRecord, OAuthProvider, TempHumiRecord } from "./types";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -65,6 +69,11 @@ function sanitizeHistoryRecords(records: TempHumiRecord[]) {
   });
 }
 
+function getAudioContext() {
+  const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  return AudioContextClass ? new AudioContextClass() : null;
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<AppTab>(DEFAULT_TAB);
   const [latest, setLatest] = useState<TempHumiRecord | null>(null);
@@ -80,6 +89,10 @@ function App() {
   const [showTempFull, setShowTempFull] = useState(false);
   const [showHumiFull, setShowHumiFull] = useState(false);
   const [chartReady, setChartReady] = useState(false);
+  const [activeIntruderAlert, setActiveIntruderAlert] = useState<IntruderAlertRecord | null>(null);
+  const [intruderAlertHistory, setIntruderAlertHistory] = useState<IntruderAlertRecord[]>([]);
+  const [intruderActionSubmitting, setIntruderActionSubmitting] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -93,12 +106,19 @@ function App() {
     const raw = window.localStorage.getItem(AUTH_PROVIDER_STORAGE_KEY);
     return raw === "google" || raw === "github" || raw === "password" ? raw : null;
   });
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const alarmIntervalRef = useRef<number | null>(null);
+
+  function clearProtectedAdminData() {
+    setActiveIntruderAlert(null);
+    setIntruderAlertHistory([]);
+  }
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [activeTab]);
 
-  async function loadData() {
+  async function loadData(includeProtected = Boolean(admin)) {
     setRefreshing(true);
 
     try {
@@ -115,6 +135,29 @@ function App() {
     } catch (err) {
       toast.error(getDashboardErrorMessage(err, "Unable to load dashboard data. Please try again."), {
         id: "dashboard-load-error"
+      });
+      setRefreshing(false);
+      return;
+    }
+
+    if (!includeProtected) {
+      clearProtectedAdminData();
+      setRefreshing(false);
+      return;
+    }
+
+    try {
+      const intruderData = await getIntruderAlerts();
+      setActiveIntruderAlert(intruderData.activeAlert);
+      setIntruderAlertHistory(intruderData.history);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearProtectedAdminData();
+        handleUnauthorizedSession();
+        return;
+      }
+      toast.error(getDashboardErrorMessage(err, "Unable to load admin-only history and intruder alerts right now."), {
+        id: "admin-dashboard-load-error"
       });
     } finally {
       setRefreshing(false);
@@ -146,6 +189,7 @@ function App() {
   function handleUnauthorizedSession() {
     clearAdminTokens();
     setAdmin(null);
+    clearProtectedAdminData();
     openAdminLogin("Session expired. Please login again.");
   }
 
@@ -250,16 +294,97 @@ function App() {
   }
 
   useEffect(() => {
-    loadData();
-    const id = window.setInterval(loadData, 5000);
+    void loadData(Boolean(admin));
+    const id = window.setInterval(() => {
+      void loadData(Boolean(admin));
+    }, 5000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [admin]);
 
   useEffect(() => {
     if (history.length === 0 || chartReady) return;
     const id = window.setTimeout(() => setChartReady(true), 40);
     return () => window.clearTimeout(id);
   }, [chartReady, history.length]);
+
+  useEffect(() => {
+    const unlockAudio = async () => {
+      try {
+        if (!audioContextRef.current) {
+          audioContextRef.current = getAudioContext();
+        }
+
+        if (audioContextRef.current?.state === "suspended") {
+          await audioContextRef.current.resume();
+        }
+
+        if (audioContextRef.current) {
+          setAudioUnlocked(true);
+        }
+      } catch {
+        // Ignore browser audio-lock failures and keep trying on later interactions.
+      }
+    };
+
+    if (audioUnlocked) return;
+
+    window.addEventListener("pointerdown", unlockAudio);
+    window.addEventListener("keydown", unlockAudio);
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+  }, [audioUnlocked]);
+
+  useEffect(() => {
+    const stopAlarm = () => {
+      if (alarmIntervalRef.current !== null) {
+        window.clearInterval(alarmIntervalRef.current);
+        alarmIntervalRef.current = null;
+      }
+    };
+
+    const playBurst = () => {
+      const audioContext = audioContextRef.current;
+      if (!audioContext) return;
+
+      const now = audioContext.currentTime;
+      const gain = audioContext.createGain();
+      gain.connect(audioContext.destination);
+      gain.gain.setValueAtTime(0.0001, now);
+
+      const pulseFrequencies = [740, 980, 740];
+      pulseFrequencies.forEach((frequency, index) => {
+        const oscillator = audioContext.createOscillator();
+        const pulseStart = now + index * 0.2;
+        oscillator.type = "sawtooth";
+        oscillator.frequency.setValueAtTime(frequency, pulseStart);
+        oscillator.connect(gain);
+        oscillator.start(pulseStart);
+        oscillator.stop(pulseStart + 0.14);
+      });
+
+      gain.gain.exponentialRampToValueAtTime(0.2, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.62);
+    };
+
+    stopAlarm();
+
+    if (!activeIntruderAlert || !audioUnlocked || !audioContextRef.current) return stopAlarm;
+
+    playBurst();
+    alarmIntervalRef.current = window.setInterval(playBurst, 900);
+    return stopAlarm;
+  }, [activeIntruderAlert, audioUnlocked]);
+
+  useEffect(() => {
+    return () => {
+      if (alarmIntervalRef.current !== null) {
+        window.clearInterval(alarmIntervalRef.current);
+      }
+      void audioContextRef.current?.close();
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -381,6 +506,7 @@ function App() {
       window.localStorage.setItem(AUTH_PROVIDER_STORAGE_KEY, "password");
       setAuthPassword("");
       setIsAuthOpen(false);
+      void loadData(true);
     } catch (err) {
       setAuthError(getAuthActionErrorMessage("login", err));
     } finally {
@@ -405,6 +531,7 @@ function App() {
       window.localStorage.setItem(AUTH_PROVIDER_STORAGE_KEY, "password");
       setAuthPassword("");
       setIsAuthOpen(false);
+      void loadData(true);
     } catch (err) {
       setAuthError(getAuthActionErrorMessage("signup", err));
     } finally {
@@ -432,6 +559,7 @@ function App() {
       window.localStorage.removeItem(AUTH_PROVIDER_STORAGE_KEY);
       setIsAuthOpen(false);
       resetCardEditing();
+      clearProtectedAdminData();
     }
   }
 
@@ -504,6 +632,48 @@ function App() {
     []
   );
 
+  async function handleAcknowledgeIntruderAlert() {
+    if (!activeIntruderAlert) return;
+    setIntruderActionSubmitting(true);
+    try {
+      await acknowledgeIntruderAlert(activeIntruderAlert.id);
+      setActiveIntruderAlert(null);
+      await loadData();
+      toast.success("Intruder alert acknowledged");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        handleUnauthorizedSession();
+        return;
+      }
+      toast.error(getDashboardErrorMessage(err, "Unable to acknowledge the intruder alert right now."), {
+        id: "intruder-alert-acknowledge-error"
+      });
+    } finally {
+      setIntruderActionSubmitting(false);
+    }
+  }
+
+  async function handleDialEmergency() {
+    if (!activeIntruderAlert) return;
+    setIntruderActionSubmitting(true);
+    try {
+      await markIntruderAlertEmergency(activeIntruderAlert.id);
+      setActiveIntruderAlert(null);
+      await loadData();
+      window.location.assign("tel:911");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        handleUnauthorizedSession();
+        return;
+      }
+      toast.error(getDashboardErrorMessage(err, "Unable to start the emergency action right now."), {
+        id: "intruder-alert-emergency-error"
+      });
+    } finally {
+      setIntruderActionSubmitting(false);
+    }
+  }
+
   return (
     <div className="relative min-h-screen bg-neutral-900 font-sans text-neutral-100 antialiased">
       <Toaster
@@ -542,6 +712,7 @@ function App() {
           <DashboardOverview
             latest={latest}
             history={history}
+            intruderAlertHistory={intruderAlertHistory}
             busy={busy}
             doorState={doorState}
             showTempFull={showTempFull}
@@ -571,6 +742,7 @@ function App() {
             onSaveEdit={handleSaveEdit}
             onCancelEdit={resetCardEditing}
             onEditingValueChange={setEditingValue}
+            onOpenAdminLogin={() => openAdminLogin()}
           />
         ) : activeTab === "feature" ? (
           <FeatureSection />
@@ -606,6 +778,14 @@ function App() {
         onRegister={handleAdminRegister}
         onStartOauth={startOauth}
         onClearAuthError={() => setAuthError(null)}
+      />
+
+      <IntruderAlertModal
+        alert={admin ? activeIntruderAlert : null}
+        canPlaySound={audioUnlocked}
+        busy={intruderActionSubmitting}
+        onAcknowledge={handleAcknowledgeIntruderAlert}
+        onDialEmergency={handleDialEmergency}
       />
     </div>
   );

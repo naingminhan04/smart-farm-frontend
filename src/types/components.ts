@@ -1,5 +1,5 @@
 import type { ChartData, ChartOptions } from "chart.js";
-import type { AdminUser, DoorState, OAuthProvider, TempHumiRecord } from ".";
+import type { AdminUser, DoorState, IntruderAlertRecord, OAuthProvider, TempHumiRecord } from ".";
 import type { AppTab, AuthTab } from "./app";
 import type { ViewerItem } from "./feature";
 
@@ -52,6 +52,7 @@ export type DashboardHeaderProps = {
 export type DashboardOverviewProps = {
   latest: TempHumiRecord | null;
   history: TempHumiRecord[];
+  intruderAlertHistory: IntruderAlertRecord[];
   busy: boolean;
   doorState: string;
   showTempFull: boolean;
@@ -81,6 +82,7 @@ export type DashboardOverviewProps = {
   onSaveEdit: (cardNum: string) => void;
   onCancelEdit: () => void;
   onEditingValueChange: (value: string) => void;
+  onOpenAdminLogin: () => void;
 };
 
 export type DoorControlCardProps = {
@@ -113,6 +115,21 @@ export type HistoryChartCardProps = {
   animationDelayClass?: string;
   onShowRecent: () => void;
   onShowFull: () => void;
+};
+
+export type IntruderAlertHistoryPanelProps = {
+  alerts: IntruderAlertRecord[];
+  admin: AdminUser | null;
+  authChecking: boolean;
+  onOpenAdminLogin: () => void;
+};
+
+export type IntruderAlertModalProps = {
+  alert: IntruderAlertRecord | null;
+  canPlaySound: boolean;
+  busy?: boolean;
+  onAcknowledge: () => void;
+  onDialEmergency: () => void;
 };
 
 export type MetricCardProps = {

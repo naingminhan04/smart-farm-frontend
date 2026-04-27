@@ -2,11 +2,13 @@ import type { DashboardOverviewProps } from "../types";
 import { CardsPanel } from "./CardsPanel";
 import { DoorControlCard } from "./DoorControlCard";
 import { HistoryChartCard } from "./HistoryChartCard";
+import { IntruderAlertHistoryPanel } from "./IntruderAlertHistoryPanel";
 import { MetricCard } from "./MetricCard";
 
 export function DashboardOverview({
   latest,
   history,
+  intruderAlertHistory,
   busy,
   doorState,
   showTempFull,
@@ -35,7 +37,8 @@ export function DashboardOverview({
   onNewCardNumChange,
   onSaveEdit,
   onCancelEdit,
-  onEditingValueChange
+  onEditingValueChange,
+  onOpenAdminLogin
 }: DashboardOverviewProps) {
   return (
     <>
@@ -91,6 +94,13 @@ export function DashboardOverview({
         onSaveEdit={onSaveEdit}
         onCancelEdit={onCancelEdit}
         onEditingValueChange={onEditingValueChange}
+      />
+
+      <IntruderAlertHistoryPanel
+        alerts={intruderAlertHistory}
+        admin={admin}
+        authChecking={authChecking}
+        onOpenAdminLogin={onOpenAdminLogin}
       />
     </>
   );
