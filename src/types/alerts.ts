@@ -1,3 +1,8 @@
+export interface IntruderAlertAdminUser {
+  id: number;
+  username: string;
+}
+
 export interface IntruderAlertRecord {
   id: number;
   source: string;
@@ -5,7 +10,11 @@ export interface IntruderAlertRecord {
   detectedAt: string;
   clearedAt: string | null;
   acknowledgedAt: string | null;
+  acknowledgedById?: number | null;
+  acknowledgedBy?: IntruderAlertAdminUser | null;
   emergencyDialedAt: string | null;
+  emergencyDialedById?: number | null;
+  emergencyDialedBy?: IntruderAlertAdminUser | null;
   createdAt: string;
   updatedAt: string;
   requiresAction: boolean;

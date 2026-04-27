@@ -59,11 +59,13 @@ export function IntruderAlertHistoryPanel({ alerts, admin, authChecking, onOpenA
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-semibold text-slate-400">Alert</div>
                   <div className="mt-1 break-all text-sm font-semibold tracking-wide text-slate-100">{alert.message}</div>
-                  <div className="mt-2 text-xs text-slate-400">Source: {alert.source}</div>
-                  <div className="mt-1 text-xs text-slate-400">Detected: {formatAlertTime(alert.detectedAt)}</div>
+                  <div className="mt-2 text-xs text-slate-400">Detected: {formatAlertTime(alert.detectedAt)}</div>
                   {alert.clearedAt ? <div className="mt-1 text-xs text-slate-400">Cleared: {formatAlertTime(alert.clearedAt)}</div> : null}
                   {alert.acknowledgedAt ? (
-                    <div className="mt-1 text-xs text-slate-400">Acknowledged: {formatAlertTime(alert.acknowledgedAt)}</div>
+                    <div className="mt-1 text-xs text-slate-400">
+                      Acknowledged: {formatAlertTime(alert.acknowledgedAt)}
+                      {alert.acknowledgedBy?.username ? ` by ${alert.acknowledgedBy.username}` : ""}
+                    </div>
                   ) : null}
                   {alert.emergencyDialedAt ? (
                     <div className="mt-1 text-xs text-slate-400">Emergency: {formatAlertTime(alert.emergencyDialedAt)}</div>
@@ -71,7 +73,6 @@ export function IntruderAlertHistoryPanel({ alerts, admin, authChecking, onOpenA
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <span className={badgeClass}>#{alert.id}</span>
                   <span
                     className={cx(
                       badgeClass,
