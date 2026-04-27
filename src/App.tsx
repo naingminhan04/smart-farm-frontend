@@ -134,8 +134,9 @@ function App() {
       oscillator.start(now);
       oscillator.stop(now + 0.02);
 
-      setAudioUnlocked(audioContext.state === "running");
-      return audioContext.state === "running";
+      const unlocked = audioContext.state === "running";
+      setAudioUnlocked(unlocked);
+      return unlocked;
     } catch {
       return false;
     }
@@ -847,9 +848,7 @@ function App() {
 
       <IntruderAlertModal
         alert={admin ? activeIntruderAlert : null}
-        canPlaySound={audioUnlocked}
         busy={intruderActionSubmitting}
-        onEnableSound={() => void unlockAlarmAudio()}
         onAcknowledge={handleAcknowledgeIntruderAlert}
         onDialEmergency={handleDialEmergency}
       />
