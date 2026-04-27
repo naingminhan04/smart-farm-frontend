@@ -3,6 +3,7 @@ import toast, { Toaster } from "react-hot-toast";
 import {
   Chart as ChartJS,
   CategoryScale,
+  type ChartOptions,
   Legend,
   LinearScale,
   LineElement,
@@ -39,9 +40,23 @@ import type { AdminUser, AppTab, OAuthProvider, TempHumiRecord } from "./types";
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
 const AUTH_PROVIDER_STORAGE_KEY = "smartfarm.authProvider";
+const OAUTH_RETURN_PATH_STORAGE_KEY = "smartfarm.oauthReturnPath";
+const DEFAULT_TAB: AppTab = "dashboard";
+
+function getTabFromPathname(pathname: string): AppTab | null {
+  if (pathname === "/dashboard") return "dashboard";
+  if (pathname === "/feature") return "feature";
+  if (pathname === "/showcase") return "showcase";
+  return null;
+}
+
+function getSafeReturnPath(pathname: string) {
+  const tab = getTabFromPathname(pathname);
+  return tab ? `/${tab}` : `/${DEFAULT_TAB}`;
+}
 
 function App() {
-  const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
+  const [activeTab, setActiveTab] = useState<AppTab>(DEFAULT_TAB);
   const [latest, setLatest] = useState<TempHumiRecord | null>(null);
   const [history, setHistory] = useState<TempHumiRecord[]>([]);
   const [doorState, setDoorStateValue] = useState("OFF");
@@ -50,9 +65,11 @@ function App() {
   const [editingCardNum, setEditingCardNum] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [cardSubmitting, setCardSubmitting] = useState(false);
+  const [doorSubmitting, setDoorSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showTempFull, setShowTempFull] = useState(false);
   const [showHumiFull, setShowHumiFull] = useState(false);
+  const [chartAnimationsEnabled, setChartAnimationsEnabled] = useState(true);
 
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -68,16 +85,22 @@ function App() {
   });
 
   useEffect(() => {
-    const applyHashTab = () => {
-      const raw = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
-      if (raw === "dashboard" || raw === "feature" || raw === "showcase") {
-        setActiveTab(raw);
+    const syncTabFromLocation = () => {
+      if (window.location.pathname === "/auth/callback") return;
+
+      const nextTab = getTabFromPathname(window.location.pathname);
+      if (nextTab) {
+        setActiveTab(nextTab);
+        return;
       }
+
+      window.history.replaceState({}, "", `/${DEFAULT_TAB}`);
+      setActiveTab(DEFAULT_TAB);
     };
 
-    applyHashTab();
-    window.addEventListener("hashchange", applyHashTab);
-    return () => window.removeEventListener("hashchange", applyHashTab);
+    syncTabFromLocation();
+    window.addEventListener("popstate", syncTabFromLocation);
+    return () => window.removeEventListener("popstate", syncTabFromLocation);
   }, []);
 
   useEffect(() => {
@@ -137,6 +160,7 @@ function App() {
 
   async function handleDoor(state: "ON" | "OFF") {
     if (!ensureAdmin("Admin login required to control the door.")) return;
+    setDoorSubmitting(true);
     try {
       await setDoorState(state);
       await loadData();
@@ -149,6 +173,8 @@ function App() {
       toast.error(getDashboardErrorMessage(err, "Unable to update the door right now. Please try again."), {
         id: "door-update-error"
       });
+    } finally {
+      setDoorSubmitting(false);
     }
   }
 
@@ -239,6 +265,17 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (activeTab !== "dashboard") return;
+    setChartAnimationsEnabled(true);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!chartAnimationsEnabled) return;
+    const id = window.setTimeout(() => setChartAnimationsEnabled(false), 350);
+    return () => window.clearTimeout(id);
+  }, [chartAnimationsEnabled]);
+
+  useEffect(() => {
     let cancelled = false;
 
     (async () => {
@@ -278,21 +315,30 @@ function App() {
 
       const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
       const params = new URLSearchParams(hash);
+      const returnPath = getSafeReturnPath(
+        window.localStorage.getItem(OAUTH_RETURN_PATH_STORAGE_KEY) || `/${DEFAULT_TAB}`
+      );
       const accessToken = params.get("accessToken") || "";
       const refreshToken = params.get("refreshToken") || "";
       const error = params.get("error") || "";
 
+      const finalizeOauthRedirect = () => {
+        window.localStorage.removeItem(OAUTH_RETURN_PATH_STORAGE_KEY);
+        window.history.replaceState({}, "", returnPath);
+        setActiveTab(getTabFromPathname(returnPath) ?? DEFAULT_TAB);
+      };
+
       if (error) {
         setAuthError(normalizeAuthErrorMessage(error) ?? "OAuth login could not be completed.");
         setIsAuthOpen(true);
-        window.history.replaceState({}, "", "/");
+        finalizeOauthRedirect();
         return;
       }
 
       if (!accessToken || !refreshToken) {
         setAuthError("OAuth callback is missing login tokens.");
         setIsAuthOpen(true);
-        window.history.replaceState({}, "", "/");
+        finalizeOauthRedirect();
         return;
       }
 
@@ -319,7 +365,7 @@ function App() {
         setAuthError("OAuth login could not be completed.");
         setIsAuthOpen(true);
       } finally {
-        window.history.replaceState({}, "", "/");
+        finalizeOauthRedirect();
       }
     }
 
@@ -381,6 +427,10 @@ function App() {
   async function startOauth(provider: OAuthProvider) {
     if (authSubmitting) return;
     setAuthError(null);
+    window.localStorage.setItem(
+      OAUTH_RETURN_PATH_STORAGE_KEY,
+      getSafeReturnPath(window.location.pathname)
+    );
     window.location.assign(adminOauthStartUrl(provider));
   }
 
@@ -400,7 +450,7 @@ function App() {
     }
   }
 
-  const busy = refreshing || cardSubmitting;
+  const busy = doorSubmitting;
   const authMethodLabel =
     authProvider === "google"
       ? "Google"
@@ -445,9 +495,14 @@ function App() {
     [history]
   );
 
-  const chartOptions = useMemo(
+  const chartOptions = useMemo<ChartOptions<"line">>(
     () => ({
       responsive: true,
+      animation: chartAnimationsEnabled
+        ? {
+            duration: 350
+          }
+        : false,
       plugins: {
         legend: { labels: { color: "#e2e8f0" } }
       },
@@ -462,7 +517,7 @@ function App() {
         }
       }
     }),
-    []
+    [chartAnimationsEnabled]
   );
 
   return (
@@ -496,7 +551,10 @@ function App() {
           admin={admin}
           onTabChange={(tab) => {
             setActiveTab(tab);
-            window.location.hash = tab;
+            const nextPath = `/${tab}`;
+            if (window.location.pathname !== nextPath) {
+              window.history.pushState({}, "", nextPath);
+            }
           }}
           onOpenAdminSession={openAdminSession}
           onOpenAdminLogin={() => openAdminLogin()}
@@ -523,10 +581,22 @@ function App() {
             editingValue={editingValue}
             newCardNum={newCardNum}
             onDoorChange={handleDoor}
-            onShowTempRecent={() => setShowTempFull(false)}
-            onShowTempFull={() => setShowTempFull(true)}
-            onShowHumiRecent={() => setShowHumiFull(false)}
-            onShowHumiFull={() => setShowHumiFull(true)}
+            onShowTempRecent={() => {
+              setChartAnimationsEnabled(true);
+              setShowTempFull(false);
+            }}
+            onShowTempFull={() => {
+              setChartAnimationsEnabled(true);
+              setShowTempFull(true);
+            }}
+            onShowHumiRecent={() => {
+              setChartAnimationsEnabled(true);
+              setShowHumiFull(false);
+            }}
+            onShowHumiFull={() => {
+              setChartAnimationsEnabled(true);
+              setShowHumiFull(true);
+            }}
             onAddCard={handleAddCard}
             onDeleteCard={handleDeleteCard}
             onEditCard={handleStartEdit}

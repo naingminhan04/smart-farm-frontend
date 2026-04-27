@@ -1,7 +1,7 @@
 import { cx } from "./utils";
 
 export const panelClass = cx(
-  "group relative overflow-hidden rounded-2xl border border-neutral-700/70 bg-neutral-900/70 p-5 shadow-[0_18px_45px_rgba(0,0,0,0.45)] backdrop-blur-xl",
+  "group relative overflow-hidden max-h-[90vh] overflow-y-hidden rounded-2xl border border-neutral-700/70 bg-neutral-900/70 p-5 shadow-[0_18px_45px_rgba(0,0,0,0.45)] backdrop-blur-xl",
   "before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(700px_circle_at_20%_0%,rgba(147,197,253,0.10),transparent_60%)] before:opacity-0 before:transition-opacity before:duration-500 group-hover:before:opacity-100"
 );
 
