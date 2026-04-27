@@ -122,21 +122,25 @@ function App() {
         await audioContext.resume();
       }
 
+      if (audioContext.state !== "running") {
+        return false;
+      }
+
       // iPhone Safari often needs one gesture-triggered sound to fully unlock Web Audio.
       const now = audioContext.currentTime;
       const oscillator = audioContext.createOscillator();
       const gain = audioContext.createGain();
-      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(880, now);
       oscillator.connect(gain);
       gain.connect(audioContext.destination);
       oscillator.start(now);
-      oscillator.stop(now + 0.02);
+      oscillator.stop(now + 0.03);
 
-      const unlocked = audioContext.state === "running";
-      setAudioUnlocked(unlocked);
-      return unlocked;
+      setAudioUnlocked(true);
+      return true;
     } catch {
       return false;
     }
@@ -347,15 +351,18 @@ function App() {
 
     if (audioUnlocked) return;
 
-    window.addEventListener("pointerdown", unlockAudio);
-    window.addEventListener("touchstart", unlockAudio);
-    window.addEventListener("click", unlockAudio);
-    window.addEventListener("keydown", unlockAudio);
+    const capture = true;
+
+    window.addEventListener("pointerup", unlockAudio, capture);
+    window.addEventListener("touchend", unlockAudio, capture);
+    window.addEventListener("mousedown", unlockAudio, capture);
+    window.addEventListener("keydown", unlockAudio, capture);
+
     return () => {
-      window.removeEventListener("pointerdown", unlockAudio);
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("click", unlockAudio);
-      window.removeEventListener("keydown", unlockAudio);
+      window.removeEventListener("pointerup", unlockAudio, capture);
+      window.removeEventListener("touchend", unlockAudio, capture);
+      window.removeEventListener("mousedown", unlockAudio, capture);
+      window.removeEventListener("keydown", unlockAudio, capture);
     };
   }, [audioUnlocked]);
 
