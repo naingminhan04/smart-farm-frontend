@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { IntruderAlertHistoryPanelProps } from "../types";
-import { badgeClass, buttonMuted, panelClass } from "./ui";
+import { badgeClass, buttonDanger, buttonMuted, panelClass } from "./ui";
 import { cx } from "./utils";
 
 function formatAlertTime(value: string) {
@@ -39,19 +39,25 @@ function getEmergencyDialedByLabel(
 function IntruderAlertHistoryDetailModal({
   alert,
   admin,
+  busy,
+  onAcknowledge,
+  onDialEmergency,
   onClose
 }: {
   alert: IntruderAlertHistoryPanelProps["alerts"][number] | null;
   admin: IntruderAlertHistoryPanelProps["admin"];
+  busy: boolean;
+  onAcknowledge: (id: number) => void | Promise<void>;
+  onDialEmergency: (id: number) => void | Promise<void>;
   onClose: () => void;
 }) {
   if (!alert) return null;
 
   const acknowledgedByLabel = getAcknowledgedByLabel(alert, admin);
   const emergencyDialedByLabel = getEmergencyDialedByLabel(alert, admin);
+  const canTakeAction = alert.requiresAction && !alert.acknowledgedAt && !alert.emergencyDialedAt;
   const details = [
     { label: "Message", value: alert.message },
-    { label: "Source", value: alert.source },
     { label: "Status", value: getAlertStatus(alert) },
     { label: "Detected At", value: formatAlertTime(alert.detectedAt) },
     alert.clearedAt ? { label: "Cleared At", value: formatAlertTime(alert.clearedAt) } : null,
@@ -59,8 +65,6 @@ function IntruderAlertHistoryDetailModal({
     acknowledgedByLabel ? { label: "Acknowledged By", value: acknowledgedByLabel } : null,
     alert.emergencyDialedAt ? { label: "Emergency Dialed At", value: formatAlertTime(alert.emergencyDialedAt) } : null,
     emergencyDialedByLabel ? { label: "Emergency Dialed By", value: emergencyDialedByLabel } : null,
-    { label: "Created At", value: formatAlertTime(alert.createdAt) },
-    { label: "Updated At", value: formatAlertTime(alert.updatedAt) },
     { label: "Requires Action", value: alert.requiresAction ? "Yes" : "No" }
   ].filter((item): item is { label: string; value: string } => Boolean(item));
 
@@ -103,12 +107,44 @@ function IntruderAlertHistoryDetailModal({
             ))}
           </div>
         </div>
+
+        {canTakeAction ? (
+          <div className="mt-5 flex flex-col gap-2 border-t border-neutral-700/70 pt-5 sm:flex-row sm:justify-end">
+            <button
+              className={buttonMuted}
+              onClick={async () => {
+                await onAcknowledge(alert.id);
+                onClose();
+              }}
+              disabled={busy}
+            >
+              {busy ? "Submitting..." : "Acknowledge"}
+            </button>
+            <button
+              className={buttonDanger}
+              onClick={async () => {
+                await onDialEmergency(alert.id);
+                onClose();
+              }}
+              disabled={busy}
+            >
+              {busy ? "Submitting..." : "Dial Emergency"}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
-export function IntruderAlertHistoryPanel({ alerts, admin, authChecking }: IntruderAlertHistoryPanelProps) {
+export function IntruderAlertHistoryPanel({
+  alerts,
+  admin,
+  authChecking,
+  intruderActionSubmitting,
+  onAcknowledgeIntruderAlert,
+  onDialEmergencyIntruderAlert
+}: IntruderAlertHistoryPanelProps) {
   const [selectedAlert, setSelectedAlert] = useState<IntruderAlertHistoryPanelProps["alerts"][number] | null>(null);
 
   return (
@@ -187,7 +223,14 @@ export function IntruderAlertHistoryPanel({ alerts, admin, authChecking }: Intru
         )}
       </section>
 
-      <IntruderAlertHistoryDetailModal alert={selectedAlert} admin={admin} onClose={() => setSelectedAlert(null)} />
+      <IntruderAlertHistoryDetailModal
+        alert={selectedAlert}
+        admin={admin}
+        busy={intruderActionSubmitting}
+        onAcknowledge={onAcknowledgeIntruderAlert}
+        onDialEmergency={onDialEmergencyIntruderAlert}
+        onClose={() => setSelectedAlert(null)}
+      />
     </>
   );
 }

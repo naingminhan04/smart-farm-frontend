@@ -10,6 +10,7 @@ export function DashboardOverview({
   history,
   intruderAlertHistory,
   busy,
+  intruderActionSubmitting,
   doorState,
   showTempFull,
   showHumiFull,
@@ -38,7 +39,9 @@ export function DashboardOverview({
   onSaveEdit,
   onCancelEdit,
   onEditingValueChange,
-  onOpenAdminLogin
+  onOpenAdminLogin,
+  onAcknowledgeIntruderAlert,
+  onDialEmergencyIntruderAlert
 }: DashboardOverviewProps) {
   return (
     <>
@@ -100,7 +103,10 @@ export function DashboardOverview({
         alerts={intruderAlertHistory}
         admin={admin}
         authChecking={authChecking}
+        intruderActionSubmitting={intruderActionSubmitting}
         onOpenAdminLogin={onOpenAdminLogin}
+        onAcknowledgeIntruderAlert={onAcknowledgeIntruderAlert}
+        onDialEmergencyIntruderAlert={onDialEmergencyIntruderAlert}
       />
     </>
   );

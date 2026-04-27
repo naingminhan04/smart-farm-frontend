@@ -54,6 +54,7 @@ export type DashboardOverviewProps = {
   history: TempHumiRecord[];
   intruderAlertHistory: IntruderAlertRecord[];
   busy: boolean;
+  intruderActionSubmitting: boolean;
   doorState: string;
   showTempFull: boolean;
   showHumiFull: boolean;
@@ -83,6 +84,8 @@ export type DashboardOverviewProps = {
   onCancelEdit: () => void;
   onEditingValueChange: (value: string) => void;
   onOpenAdminLogin: () => void;
+  onAcknowledgeIntruderAlert: (id: number) => void | Promise<void>;
+  onDialEmergencyIntruderAlert: (id: number) => void | Promise<void>;
 };
 
 export type DoorControlCardProps = {
@@ -121,7 +124,10 @@ export type IntruderAlertHistoryPanelProps = {
   alerts: IntruderAlertRecord[];
   admin: AdminUser | null;
   authChecking: boolean;
+  intruderActionSubmitting: boolean;
   onOpenAdminLogin: () => void;
+  onAcknowledgeIntruderAlert: (id: number) => void | Promise<void>;
+  onDialEmergencyIntruderAlert: (id: number) => void | Promise<void>;
 };
 
 export type IntruderAlertModalProps = {

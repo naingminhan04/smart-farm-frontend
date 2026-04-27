@@ -653,11 +653,51 @@ function App() {
     }
   }
 
+  async function handleAcknowledgeIntruderAlertById(id: number) {
+    setIntruderActionSubmitting(true);
+    try {
+      await acknowledgeIntruderAlert(id);
+      setActiveIntruderAlert(null);
+      await loadData();
+      toast.success("Intruder alert acknowledged");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        handleUnauthorizedSession();
+        return;
+      }
+      toast.error(getDashboardErrorMessage(err, "Unable to acknowledge the intruder alert right now."), {
+        id: "intruder-alert-acknowledge-error"
+      });
+    } finally {
+      setIntruderActionSubmitting(false);
+    }
+  }
+
   async function handleDialEmergency() {
     if (!activeIntruderAlert) return;
     setIntruderActionSubmitting(true);
     try {
       await markIntruderAlertEmergency(activeIntruderAlert.id);
+      setActiveIntruderAlert(null);
+      await loadData();
+      window.location.assign("tel:911");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        handleUnauthorizedSession();
+        return;
+      }
+      toast.error(getDashboardErrorMessage(err, "Unable to start the emergency action right now."), {
+        id: "intruder-alert-emergency-error"
+      });
+    } finally {
+      setIntruderActionSubmitting(false);
+    }
+  }
+
+  async function handleDialEmergencyById(id: number) {
+    setIntruderActionSubmitting(true);
+    try {
+      await markIntruderAlertEmergency(id);
       setActiveIntruderAlert(null);
       await loadData();
       window.location.assign("tel:911");
@@ -714,6 +754,7 @@ function App() {
             history={history}
             intruderAlertHistory={intruderAlertHistory}
             busy={busy}
+            intruderActionSubmitting={intruderActionSubmitting}
             doorState={doorState}
             showTempFull={showTempFull}
             showHumiFull={showHumiFull}
@@ -743,6 +784,8 @@ function App() {
             onCancelEdit={resetCardEditing}
             onEditingValueChange={setEditingValue}
             onOpenAdminLogin={() => openAdminLogin()}
+            onAcknowledgeIntruderAlert={handleAcknowledgeIntruderAlertById}
+            onDialEmergencyIntruderAlert={handleDialEmergencyById}
           />
         ) : activeTab === "feature" ? (
           <FeatureSection />
