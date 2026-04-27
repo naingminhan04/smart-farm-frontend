@@ -40,19 +40,29 @@ import type { AdminUser, AppTab, OAuthProvider, TempHumiRecord } from "./types";
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
 const AUTH_PROVIDER_STORAGE_KEY = "smartfarm.authProvider";
-const OAUTH_RETURN_PATH_STORAGE_KEY = "smartfarm.oauthReturnPath";
+const OAUTH_RETURN_TAB_STORAGE_KEY = "smartfarm.oauthReturnTab";
 const DEFAULT_TAB: AppTab = "dashboard";
 
-function getTabFromPathname(pathname: string): AppTab | null {
-  if (pathname === "/dashboard") return "dashboard";
-  if (pathname === "/feature") return "feature";
-  if (pathname === "/showcase") return "showcase";
-  return null;
-}
+function sanitizeHistoryRecords(records: TempHumiRecord[]) {
+  return records.map((record, index, source) => {
+    const previous = source[index - 1];
+    const next = source[index + 1];
 
-function getSafeReturnPath(pathname: string) {
-  const tab = getTabFromPathname(pathname);
-  return tab ? `/${tab}` : `/${DEFAULT_TAB}`;
+    const shouldHideIsolatedDrop = (value: number | null, key: "temperature" | "humidity") => {
+      if (value === null || value > 0 || !previous || !next) return false;
+
+      const previousValue = previous[key];
+      const nextValue = next[key];
+
+      return previousValue !== null && previousValue > 0 && nextValue !== null && nextValue > 0;
+    };
+
+    return {
+      ...record,
+      temperature: shouldHideIsolatedDrop(record.temperature, "temperature") ? null : record.temperature,
+      humidity: shouldHideIsolatedDrop(record.humidity, "humidity") ? null : record.humidity
+    };
+  });
 }
 
 function App() {
@@ -83,25 +93,6 @@ function App() {
     const raw = window.localStorage.getItem(AUTH_PROVIDER_STORAGE_KEY);
     return raw === "google" || raw === "github" || raw === "password" ? raw : null;
   });
-
-  useEffect(() => {
-    const syncTabFromLocation = () => {
-      if (window.location.pathname === "/auth/callback") return;
-
-      const nextTab = getTabFromPathname(window.location.pathname);
-      if (nextTab) {
-        setActiveTab(nextTab);
-        return;
-      }
-
-      window.history.replaceState({}, "", `/${DEFAULT_TAB}`);
-      setActiveTab(DEFAULT_TAB);
-    };
-
-    syncTabFromLocation();
-    window.addEventListener("popstate", syncTabFromLocation);
-    return () => window.removeEventListener("popstate", syncTabFromLocation);
-  }, []);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -315,17 +306,19 @@ function App() {
 
       const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
       const params = new URLSearchParams(hash);
-      const returnPath = getSafeReturnPath(
-        window.localStorage.getItem(OAUTH_RETURN_PATH_STORAGE_KEY) || `/${DEFAULT_TAB}`
-      );
+      const storedTab = window.localStorage.getItem(OAUTH_RETURN_TAB_STORAGE_KEY);
+      const returnTab: AppTab =
+        storedTab === "feature" || storedTab === "showcase" || storedTab === "dashboard"
+          ? storedTab
+          : DEFAULT_TAB;
       const accessToken = params.get("accessToken") || "";
       const refreshToken = params.get("refreshToken") || "";
       const error = params.get("error") || "";
 
       const finalizeOauthRedirect = () => {
-        window.localStorage.removeItem(OAUTH_RETURN_PATH_STORAGE_KEY);
-        window.history.replaceState({}, "", returnPath);
-        setActiveTab(getTabFromPathname(returnPath) ?? DEFAULT_TAB);
+        window.localStorage.removeItem(OAUTH_RETURN_TAB_STORAGE_KEY);
+        window.history.replaceState({}, "", "/");
+        setActiveTab(returnTab);
       };
 
       if (error) {
@@ -427,10 +420,7 @@ function App() {
   async function startOauth(provider: OAuthProvider) {
     if (authSubmitting) return;
     setAuthError(null);
-    window.localStorage.setItem(
-      OAUTH_RETURN_PATH_STORAGE_KEY,
-      getSafeReturnPath(window.location.pathname)
-    );
+    window.localStorage.setItem(OAUTH_RETURN_TAB_STORAGE_KEY, activeTab);
     window.location.assign(adminOauthStartUrl(provider));
   }
 
@@ -473,26 +463,29 @@ function App() {
         data: records.map((row) => row[key]),
         borderColor: color,
         tension: 0.3,
-        fill: false
+        fill: false,
+        spanGaps: true
       }
     ]
   });
 
+  const sanitizedHistory = useMemo(() => sanitizeHistoryRecords(history), [history]);
+
   const tempRecentData = useMemo(
-    () => buildChartData(history.slice(-15), "temperature", "Temperature (Recent)", "#f87171"),
-    [history]
+    () => buildChartData(sanitizedHistory.slice(-15), "temperature", "Temperature (Recent)", "#f87171"),
+    [sanitizedHistory]
   );
   const tempFullData = useMemo(
-    () => buildChartData(history, "temperature", "Temperature (Full)", "#fb7185"),
-    [history]
+    () => buildChartData(sanitizedHistory, "temperature", "Temperature (Full)", "#fb7185"),
+    [sanitizedHistory]
   );
   const humiRecentData = useMemo(
-    () => buildChartData(history.slice(-15), "humidity", "Humidity (Recent)", "#60a5fa"),
-    [history]
+    () => buildChartData(sanitizedHistory.slice(-15), "humidity", "Humidity (Recent)", "#60a5fa"),
+    [sanitizedHistory]
   );
   const humiFullData = useMemo(
-    () => buildChartData(history, "humidity", "Humidity (Full)", "#60a5fa"),
-    [history]
+    () => buildChartData(sanitizedHistory, "humidity", "Humidity (Full)", "#60a5fa"),
+    [sanitizedHistory]
   );
 
   const chartOptions = useMemo<ChartOptions<"line">>(
@@ -549,13 +542,7 @@ function App() {
         <DashboardHeader
           activeTab={activeTab}
           admin={admin}
-          onTabChange={(tab) => {
-            setActiveTab(tab);
-            const nextPath = `/${tab}`;
-            if (window.location.pathname !== nextPath) {
-              window.history.pushState({}, "", nextPath);
-            }
-          }}
+          onTabChange={setActiveTab}
           onOpenAdminSession={openAdminSession}
           onOpenAdminLogin={() => openAdminLogin()}
         />
