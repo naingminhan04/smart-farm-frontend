@@ -74,6 +74,15 @@ function getAudioContext() {
   return AudioContextClass ? new AudioContextClass() : null;
 }
 
+function shouldShowAudioArmingHint() {
+  const userAgent = navigator.userAgent || "";
+  const platform = navigator.platform || "";
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+  const isAppleMobile = /iPhone|iPad|iPod/i.test(userAgent) || (platform === "MacIntel" && maxTouchPoints > 1);
+  const isTouchDevice = maxTouchPoints > 0 || /Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  return isAppleMobile || isTouchDevice;
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<AppTab>(DEFAULT_TAB);
   const [latest, setLatest] = useState<TempHumiRecord | null>(null);
@@ -93,6 +102,7 @@ function App() {
   const [intruderAlertHistory, setIntruderAlertHistory] = useState<IntruderAlertRecord[]>([]);
   const [intruderActionSubmitting, setIntruderActionSubmitting] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [showAudioArmingHint, setShowAudioArmingHint] = useState(() => shouldShowAudioArmingHint());
 
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -140,6 +150,7 @@ function App() {
       oscillator.stop(now + 0.03);
 
       setAudioUnlocked(true);
+      setShowAudioArmingHint(false);
       return true;
     } catch {
       return false;
@@ -770,6 +781,12 @@ function App() {
       </div>
 
       <div className="relative mx-auto max-w-[1200px] px-4 py-6 sm:px-6">
+        {showAudioArmingHint && !audioUnlocked ? (
+          <div className="mb-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-50">
+            Tap anywhere once to arm alarm sound for future intruder alerts on this page.
+          </div>
+        ) : null}
+
         <DashboardHeader
           activeTab={activeTab}
           admin={admin}
