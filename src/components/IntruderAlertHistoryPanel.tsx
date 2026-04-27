@@ -24,6 +24,17 @@ function getAcknowledgedByLabel(
   return null;
 }
 
+function getEmergencyDialedByLabel(
+  alert: IntruderAlertHistoryPanelProps["alerts"][number],
+  admin: IntruderAlertHistoryPanelProps["admin"]
+) {
+  if (alert.emergencyDialedBy?.username) return alert.emergencyDialedBy.username;
+  if (alert.emergencyDialedByUsername) return alert.emergencyDialedByUsername;
+  if (admin && alert.emergencyDialedById === admin.id) return admin.username;
+  if (alert.emergencyDialedById) return `Admin #${alert.emergencyDialedById}`;
+  return null;
+}
+
 export function IntruderAlertHistoryPanel({ alerts, admin, authChecking }: IntruderAlertHistoryPanelProps) {
   return (
     <section className={cx(panelClass, "mt-6 animate-fade-up [animation-delay:120ms]")}>
@@ -64,29 +75,39 @@ export function IntruderAlertHistoryPanel({ alerts, admin, authChecking }: Intru
           {alerts.length ? (
             alerts.map((alert) => {
               const acknowledgedByLabel = getAcknowledgedByLabel(alert, admin);
+              const emergencyDialedByLabel = getEmergencyDialedByLabel(alert, admin);
+              const actionSummary = alert.emergencyDialedAt
+                ? {
+                    label: `Emergency dialed${emergencyDialedByLabel ? ` by ${emergencyDialedByLabel}` : ""}`,
+                    time: formatAlertTime(alert.emergencyDialedAt)
+                  }
+                : alert.acknowledgedAt
+                  ? {
+                      label: `Acknowledged${acknowledgedByLabel ? ` by ${acknowledgedByLabel}` : ""}`,
+                      time: formatAlertTime(alert.acknowledgedAt)
+                    }
+                  : alert.clearedAt
+                    ? {
+                        label: "Cleared",
+                        time: formatAlertTime(alert.clearedAt)
+                      }
+                    : null;
 
               return (
                 <li
                   key={alert.id}
-                  className="flex flex-col gap-3 rounded-2xl border border-neutral-700/70 bg-neutral-800/70 px-4 py-3 text-sm text-slate-200 transition hover:bg-neutral-700/70 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 rounded-2xl border border-neutral-700/70 bg-neutral-800/70 px-4 py-3 text-sm text-slate-200 transition hover:bg-neutral-700/70 sm:flex-row sm:items-start sm:justify-between"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-semibold text-slate-400">Alert</div>
                     <div className="mt-1 break-all text-sm font-semibold tracking-wide text-slate-100">{alert.message}</div>
                     <div className="mt-2 text-xs text-slate-400">Detected: {formatAlertTime(alert.detectedAt)}</div>
-                    {alert.clearedAt ? <div className="mt-1 text-xs text-slate-400">Cleared: {formatAlertTime(alert.clearedAt)}</div> : null}
-                    {alert.acknowledgedAt ? (
-                      <div className="mt-1 text-xs text-slate-400">
-                        Acknowledged: {formatAlertTime(alert.acknowledgedAt)}
-                        {acknowledgedByLabel ? ` by ${acknowledgedByLabel}` : ""}
-                      </div>
-                    ) : null}
-                    {alert.emergencyDialedAt ? (
-                      <div className="mt-1 text-xs text-slate-400">Emergency: {formatAlertTime(alert.emergencyDialedAt)}</div>
+                    {alert.clearedAt && !actionSummary ? (
+                      <div className="mt-1 text-xs text-slate-400">Cleared: {formatAlertTime(alert.clearedAt)}</div>
                     ) : null}
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex shrink-0 flex-col gap-2 sm:min-w-[220px] sm:items-end sm:text-right">
                     <span
                       className={cx(
                         badgeClass,
@@ -99,6 +120,12 @@ export function IntruderAlertHistoryPanel({ alerts, admin, authChecking }: Intru
                     >
                       {getAlertStatus(alert)}
                     </span>
+                    {actionSummary ? (
+                      <div className="rounded-xl border border-neutral-700/70 bg-neutral-900/50 px-3 py-2">
+                        <div className="text-xs font-semibold text-slate-300">{actionSummary.label}</div>
+                        <div className="mt-1 text-xs text-slate-400">{actionSummary.time}</div>
+                      </div>
+                    ) : null}
                   </div>
                 </li>
               );
