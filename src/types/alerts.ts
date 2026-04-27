@@ -12,9 +12,11 @@ export interface IntruderAlertRecord {
   acknowledgedAt: string | null;
   acknowledgedById?: number | null;
   acknowledgedBy?: IntruderAlertAdminUser | null;
+  acknowledgedByUsername?: string | null;
   emergencyDialedAt: string | null;
   emergencyDialedById?: number | null;
   emergencyDialedBy?: IntruderAlertAdminUser | null;
+  emergencyDialedByUsername?: string | null;
   createdAt: string;
   updatedAt: string;
   requiresAction: boolean;

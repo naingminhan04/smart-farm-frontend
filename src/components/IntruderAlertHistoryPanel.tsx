@@ -1,5 +1,5 @@
 import type { IntruderAlertHistoryPanelProps } from "../types";
-import { badgeClass, buttonMuted, panelClass } from "./ui";
+import { badgeClass, panelClass } from "./ui";
 import { cx } from "./utils";
 
 function formatAlertTime(value: string) {
@@ -13,7 +13,18 @@ function getAlertStatus(alert: IntruderAlertHistoryPanelProps["alerts"][number])
   return "Active";
 }
 
-export function IntruderAlertHistoryPanel({ alerts, admin, authChecking, onOpenAdminLogin }: IntruderAlertHistoryPanelProps) {
+function getAcknowledgedByLabel(
+  alert: IntruderAlertHistoryPanelProps["alerts"][number],
+  admin: IntruderAlertHistoryPanelProps["admin"]
+) {
+  if (alert.acknowledgedBy?.username) return alert.acknowledgedBy.username;
+  if (alert.acknowledgedByUsername) return alert.acknowledgedByUsername;
+  if (admin && alert.acknowledgedById === admin.id) return admin.username;
+  if (alert.acknowledgedById) return `Admin #${alert.acknowledgedById}`;
+  return null;
+}
+
+export function IntruderAlertHistoryPanel({ alerts, admin, authChecking }: IntruderAlertHistoryPanelProps) {
   return (
     <section className={cx(panelClass, "mt-6 animate-fade-up [animation-delay:120ms]")}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -49,45 +60,49 @@ export function IntruderAlertHistoryPanel({ alerts, admin, authChecking, onOpenA
         </>
       ) : (
       <div className="mt-5">
-        <ul className="space-y-2">
+        <ul className="scrollbar-none max-h-[22rem] space-y-2 overflow-y-auto pr-1">
           {alerts.length ? (
-            alerts.map((alert) => (
-              <li
-                key={alert.id}
-                className="flex flex-col gap-3 rounded-2xl border border-neutral-700/70 bg-neutral-800/70 px-4 py-3 text-sm text-slate-200 transition hover:bg-neutral-700/70 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold text-slate-400">Alert</div>
-                  <div className="mt-1 break-all text-sm font-semibold tracking-wide text-slate-100">{alert.message}</div>
-                  <div className="mt-2 text-xs text-slate-400">Detected: {formatAlertTime(alert.detectedAt)}</div>
-                  {alert.clearedAt ? <div className="mt-1 text-xs text-slate-400">Cleared: {formatAlertTime(alert.clearedAt)}</div> : null}
-                  {alert.acknowledgedAt ? (
-                    <div className="mt-1 text-xs text-slate-400">
-                      Acknowledged: {formatAlertTime(alert.acknowledgedAt)}
-                      {alert.acknowledgedBy?.username ? ` by ${alert.acknowledgedBy.username}` : ""}
-                    </div>
-                  ) : null}
-                  {alert.emergencyDialedAt ? (
-                    <div className="mt-1 text-xs text-slate-400">Emergency: {formatAlertTime(alert.emergencyDialedAt)}</div>
-                  ) : null}
-                </div>
+            alerts.map((alert) => {
+              const acknowledgedByLabel = getAcknowledgedByLabel(alert, admin);
 
-                <div className="flex flex-wrap gap-2">
-                  <span
-                    className={cx(
-                      badgeClass,
-                      alert.emergencyDialedAt
-                        ? "border-red-300/40 bg-red-500/20 text-red-50"
-                        : alert.acknowledgedAt
-                          ? "border-emerald-300/30 bg-emerald-500/15 text-emerald-50"
-                          : "border-amber-300/30 bg-amber-500/15 text-amber-50"
-                    )}
-                  >
-                    {getAlertStatus(alert)}
-                  </span>
-                </div>
-              </li>
-            ))
+              return (
+                <li
+                  key={alert.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-neutral-700/70 bg-neutral-800/70 px-4 py-3 text-sm text-slate-200 transition hover:bg-neutral-700/70 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-semibold text-slate-400">Alert</div>
+                    <div className="mt-1 break-all text-sm font-semibold tracking-wide text-slate-100">{alert.message}</div>
+                    <div className="mt-2 text-xs text-slate-400">Detected: {formatAlertTime(alert.detectedAt)}</div>
+                    {alert.clearedAt ? <div className="mt-1 text-xs text-slate-400">Cleared: {formatAlertTime(alert.clearedAt)}</div> : null}
+                    {alert.acknowledgedAt ? (
+                      <div className="mt-1 text-xs text-slate-400">
+                        Acknowledged: {formatAlertTime(alert.acknowledgedAt)}
+                        {acknowledgedByLabel ? ` by ${acknowledgedByLabel}` : ""}
+                      </div>
+                    ) : null}
+                    {alert.emergencyDialedAt ? (
+                      <div className="mt-1 text-xs text-slate-400">Emergency: {formatAlertTime(alert.emergencyDialedAt)}</div>
+                    ) : null}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <span
+                      className={cx(
+                        badgeClass,
+                        alert.emergencyDialedAt
+                          ? "border-red-300/40 bg-red-500/20 text-red-50"
+                          : alert.acknowledgedAt
+                            ? "border-emerald-300/30 bg-emerald-500/15 text-emerald-50"
+                            : "border-amber-300/30 bg-amber-500/15 text-amber-50"
+                      )}
+                    >
+                      {getAlertStatus(alert)}
+                    </span>
+                  </div>
+                </li>
+              );
+            })
           ) : (
             <li className="rounded-2xl border border-neutral-700/70 bg-neutral-800/70 px-4 py-3 text-sm text-slate-300">
               No intruder alerts yet.

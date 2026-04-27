@@ -46,7 +46,7 @@ export function AuthModal({
       <div
         className={cx(
           panelClass,
-          "before:hidden relative z-10 flex w-full max-w-md flex-col",
+          "before:hidden relative z-10 flex max-h-[min(90vh,40rem)] w-full max-w-md flex-col",
         )}
       >
         <div className="flex items-start justify-between gap-4">
@@ -77,8 +77,8 @@ export function AuthModal({
           </div>
         )}
         {admin ? (
-          <>
-            <div className="mt-4 space-y-3">
+          <div className="scrollbar-none mt-4 min-h-0 flex-1 overflow-y-auto">
+            <div className="space-y-3">
               <div className="rounded-2xl border border-neutral-700/70 bg-neutral-800/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Logged In User
@@ -115,7 +115,7 @@ export function AuthModal({
                 Logout
               </button>
             </div>
-          </>
+          </div>
         ) : (
           <>
             <div className="mt-4 flex w-full items-center rounded-full border border-neutral-700/70 bg-neutral-800/70 p-1">
