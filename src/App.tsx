@@ -79,7 +79,6 @@ function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [showTempFull, setShowTempFull] = useState(false);
   const [showHumiFull, setShowHumiFull] = useState(false);
-  const [chartAnimationsEnabled, setChartAnimationsEnabled] = useState(true);
 
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -254,17 +253,6 @@ function App() {
     const id = window.setInterval(loadData, 5000);
     return () => window.clearInterval(id);
   }, []);
-
-  useEffect(() => {
-    if (activeTab !== "dashboard") return;
-    setChartAnimationsEnabled(true);
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (!chartAnimationsEnabled) return;
-    const id = window.setTimeout(() => setChartAnimationsEnabled(false), 350);
-    return () => window.clearTimeout(id);
-  }, [chartAnimationsEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -491,11 +479,7 @@ function App() {
   const chartOptions = useMemo<ChartOptions<"line">>(
     () => ({
       responsive: true,
-      animation: chartAnimationsEnabled
-        ? {
-            duration: 350
-          }
-        : false,
+      animation: false,
       plugins: {
         legend: { labels: { color: "#e2e8f0" } }
       },
@@ -510,7 +494,7 @@ function App() {
         }
       }
     }),
-    [chartAnimationsEnabled]
+    []
   );
 
   return (
@@ -568,22 +552,10 @@ function App() {
             editingValue={editingValue}
             newCardNum={newCardNum}
             onDoorChange={handleDoor}
-            onShowTempRecent={() => {
-              setChartAnimationsEnabled(true);
-              setShowTempFull(false);
-            }}
-            onShowTempFull={() => {
-              setChartAnimationsEnabled(true);
-              setShowTempFull(true);
-            }}
-            onShowHumiRecent={() => {
-              setChartAnimationsEnabled(true);
-              setShowHumiFull(false);
-            }}
-            onShowHumiFull={() => {
-              setChartAnimationsEnabled(true);
-              setShowHumiFull(true);
-            }}
+            onShowTempRecent={() => setShowTempFull(false)}
+            onShowTempFull={() => setShowTempFull(true)}
+            onShowHumiRecent={() => setShowHumiFull(false)}
+            onShowHumiFull={() => setShowHumiFull(true)}
             onAddCard={handleAddCard}
             onDeleteCard={handleDeleteCard}
             onEditCard={handleStartEdit}
